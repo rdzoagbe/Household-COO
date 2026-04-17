@@ -224,12 +224,27 @@ export default function FeedScreen() {
           setShowAdd(true);
         }}
         onCamera={() => {
-          setVoiceDraft(null);
-          setAddSource('CAMERA');
-          setShowAdd(true);
+          setShowCamera(true);
         }}
         onVoice={() => {
           setShowVoice(true);
+        }}
+      />
+
+      <CameraCaptureModal
+        visible={showCamera}
+        onClose={() => setShowCamera(false)}
+        onDraft={(d) => {
+          setVoiceDraft({
+            transcript: '',
+            type: d.type,
+            title: d.title,
+            description: d.description,
+            assignee: d.assignee,
+          });
+          setAddSource('CAMERA');
+          setShowCamera(false);
+          setShowAdd(true);
         }}
       />
 
