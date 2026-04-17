@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Text, Platform } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { Home, Calendar as CalendarIcon, Lock, Settings as SettingsIcon } from 'lucide-react-native';
+import { Home, Calendar as CalendarIcon, Lock, Settings as SettingsIcon, Star } from 'lucide-react-native';
 import { useStore } from '../../src/store';
 
 function TabIcon({ focused, Icon, label }: { focused: boolean; Icon: any; label: string }) {
@@ -60,6 +60,12 @@ export default function TabLayout() {
         name="calendar"
         options={{
           tabBarIcon: ({ focused }) => <TabIcon focused={focused} Icon={CalendarIcon} label={t('calendar')} />,
+        }}
+      />
+      <Tabs.Screen
+        name="kids"
+        options={{
+          tabBarIcon: ({ focused }) => <TabIcon focused={focused} Icon={Star} label={t('kids')} />,
         }}
       />
       <Tabs.Screen

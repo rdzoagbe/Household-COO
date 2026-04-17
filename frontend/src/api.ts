@@ -46,6 +46,7 @@ async function request<T = any>(
 
 export type CardType = 'SIGN_SLIP' | 'RSVP' | 'TASK';
 export type CardStatus = 'OPEN' | 'DONE';
+export type Recurrence = 'none' | 'daily' | 'weekly' | 'monthly';
 
 export interface Card {
   card_id: string;
@@ -58,6 +59,8 @@ export interface Card {
   status: CardStatus;
   source: 'AI' | 'MANUAL' | 'VOICE' | 'CAMERA';
   image_base64?: string | null;
+  recurrence: Recurrence;
+  reminder_minutes: number;
   created_at: string;
   completed_at?: string | null;
 }
@@ -77,6 +80,16 @@ export interface FamilyMember {
   name: string;
   role: string;
   avatar?: string | null;
+  stars: number;
+}
+
+export interface Reward {
+  reward_id: string;
+  family_id: string;
+  title: string;
+  cost_stars: number;
+  icon?: string | null;
+  created_at: string;
 }
 
 export interface VaultDoc {
@@ -114,7 +127,56 @@ export const api = {
   createVaultDoc: (data: { title: string; category: string; image_base64: string }) =>
     request<VaultDoc>('/vault', { method: 'POST', body: data }),
   deleteVaultDoc: (id: string) => request(`/vault/${id}`, { method: 'DELETE' }),
+  // Rewards
+  listRewards: () => request<Reward[]>('/rewards'),
+  createReward: (data: { title: string; cost_stars: number; icon?: string }) =>
+    request<Reward>('/rewards', { method: 'POST', body: data }),
+  deleteReward: (id: string) => request(`/rewards/${id}`, { method: 'DELETE' }),
+  redeemReward: (id: string, member_id: string) =>
+    request<{ ok: boolean; member: FamilyMember }>(`/rewards/${id}/redeem`, {
+      method: 'POST',
+      body: { member_id },
+    }),
+  // Conflicts
+  conflicts: (due_date: string, exclude_id?: string) =>
+    request<Card[]>(
+      `/cards/conflicts?due_date=${encodeURIComponent(due_date)}${
+        exclude_id ? `&exclude_id=${exclude_id}` : ''
+      }`
+    ),
+  // Vision
+  visionExtract: (image_base64: string) =>
+    request<{
+      type: CardType;
+      title: string;
+      description: string;
+      assignee: string;
+      due_date?: string | null;
+    }>('/vision/extract', { method: 'POST', body: { image_base64 } }),
   // Brief
   weeklyBrief: () =>
     request<{ brief: string; generated_at: string }>('/brief/weekly', { method: 'POST' }),
+  // Voice transcribe
+  voiceTranscribe: async (blob: Blob): Promise<{
+    transcript: string;
+    type: CardType;
+    title: string;
+    description: string;
+    assignee: string;
+  }> => {
+    const token = await tokenStore.get();
+    const form = new FormData();
+    const file = new File([blob], 'voice.webm', { type: blob.type || 'audio/webm' });
+    form.append('audio', file);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${BASE}/api/voice/transcribe`, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: form,
+    });
+    if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+    return res.json();
+  },
 };

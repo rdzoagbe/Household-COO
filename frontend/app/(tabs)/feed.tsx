@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sparkles } from 'lucide-react-native';
+import { Sparkles, Bell } from 'lucide-react-native';
 import { useFocusEffect } from 'expo-router';
 import { AmbientBackground } from '../../src/components/AmbientBackground';
 import { PressScale } from '../../src/components/PressScale';
@@ -17,17 +17,30 @@ import { SmartCard } from '../../src/components/SmartCard';
 import { FloatingActionBar } from '../../src/components/FloatingActionBar';
 import { AddCardModal } from '../../src/components/AddCardModal';
 import { SundayBriefModal } from '../../src/components/SundayBriefModal';
+import { VoiceCaptureModal } from '../../src/components/VoiceCaptureModal';
+import { CameraCaptureModal } from '../../src/components/CameraCaptureModal';
 import { useStore } from '../../src/store';
-import { api, Card } from '../../src/api';
+import { api, Card, CardType } from '../../src/api';
+
+interface VoiceDraft {
+  transcript: string;
+  type: CardType;
+  title: string;
+  description: string;
+  assignee: string;
+}
 
 export default function FeedScreen() {
-  const { user, t, lang } = useStore();
+  const { user, t } = useStore();
   const [cards, setCards] = useState<Card[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showBrief, setShowBrief] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
   const [addSource, setAddSource] = useState<'MANUAL' | 'VOICE' | 'CAMERA'>('MANUAL');
+  const [voiceDraft, setVoiceDraft] = useState<VoiceDraft | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -73,6 +86,27 @@ export default function FeedScreen() {
   };
 
   const openCount = cards.filter((c) => c.status === 'OPEN').length;
+
+  const upcomingReminders = useMemo(() => {
+    const now = Date.now();
+    const in24h = now + 24 * 60 * 60 * 1000;
+    return cards
+      .filter((c) => c.status === 'OPEN' && c.due_date && (c.reminder_minutes || 0) > 0)
+      .filter((c) => {
+        try {
+          const due = new Date(c.due_date as string).getTime();
+          const remindAt = due - (c.reminder_minutes || 0) * 60 * 1000;
+          return remindAt >= now - 60 * 60 * 1000 && remindAt <= in24h;
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => {
+        const da = new Date(a.due_date as string).getTime() - (a.reminder_minutes || 0) * 60 * 1000;
+        const dbv = new Date(b.due_date as string).getTime() - (b.reminder_minutes || 0) * 60 * 1000;
+        return da - dbv;
+      });
+  }, [cards]);
 
   const greeting = (() => {
     const h = new Date().getHours();
@@ -130,6 +164,33 @@ export default function FeedScreen() {
             <Text style={styles.briefSub}>{t('sunday_brief_subtitle')}</Text>
           </PressScale>
 
+          {/* Reminders banner */}
+          {upcomingReminders.length > 0 && (
+            <View testID="reminders-banner" style={styles.remindersCard}>
+              <View style={styles.remindersHeader}>
+                <Bell color="#F97316" size={14} />
+                <Text style={styles.remindersTitle}>
+                  {t('reminders')} · {upcomingReminders.length}
+                </Text>
+              </View>
+              {upcomingReminders.slice(0, 3).map((c) => {
+                const due = new Date(c.due_date as string).getTime();
+                const remindAt = due - (c.reminder_minutes || 0) * 60 * 1000;
+                const mins = Math.max(0, Math.round((remindAt - Date.now()) / 60000));
+                const label =
+                  mins <= 1 ? 'now' : mins < 60 ? `in ${mins}m` : `in ${Math.round(mins / 60)}h`;
+                return (
+                  <View key={c.card_id} style={styles.remindersRow}>
+                    <Text style={styles.remindersItem} numberOfLines={1}>
+                      {c.title}
+                    </Text>
+                    <Text style={styles.remindersWhen}>{label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           {/* Feed */}
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>{t('this_week')}</Text>
@@ -158,24 +219,40 @@ export default function FeedScreen() {
 
       <FloatingActionBar
         onManual={() => {
+          setVoiceDraft(null);
           setAddSource('MANUAL');
           setShowAdd(true);
         }}
         onCamera={() => {
+          setVoiceDraft(null);
           setAddSource('CAMERA');
           setShowAdd(true);
         }}
         onVoice={() => {
+          setShowVoice(true);
+        }}
+      />
+
+      <VoiceCaptureModal
+        visible={showVoice}
+        onClose={() => setShowVoice(false)}
+        onDraft={(d) => {
+          setVoiceDraft(d);
           setAddSource('VOICE');
+          setShowVoice(false);
           setShowAdd(true);
         }}
       />
 
       <AddCardModal
         visible={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={() => {
+          setShowAdd(false);
+          setVoiceDraft(null);
+        }}
         onCreated={load}
         initialSource={addSource}
+        initialDraft={voiceDraft}
       />
       <SundayBriefModal visible={showBrief} onClose={() => setShowBrief(false)} />
     </View>
@@ -243,6 +320,40 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 13,
     marginTop: 4,
+  },
+  remindersCard: {
+    marginBottom: 20,
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(249,115,22,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(249,115,22,0.3)',
+  },
+  remindersHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  remindersTitle: {
+    color: '#F97316',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  remindersRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  remindersItem: {
+    flex: 1,
+    color: '#fff',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+    marginRight: 12,
+  },
+  remindersWhen: {
+    color: 'rgba(255,255,255,0.75)',
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
   },
   section: { marginBottom: 14 },
   sectionLabel: {

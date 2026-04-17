@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { CheckCircle2, FileSignature, Mail, ListTodo, Trash2, Sparkles, Mic, Camera, Edit3 } from 'lucide-react-native';
+import { CheckCircle2, FileSignature, Mail, ListTodo, Trash2, Sparkles, Mic, Camera, Edit3, Repeat, Bell } from 'lucide-react-native';
 import { GlassCard } from './GlassCard';
 import { PressScale } from './PressScale';
 import { Card } from '../api';
@@ -104,6 +104,26 @@ export function SmartCard({ card, onComplete, onDelete }: Props) {
               <Text style={styles.metaText}>{card.assignee}</Text>
             </>
           ) : null}
+          {card.recurrence && card.recurrence !== 'none' ? (
+            <>
+              <Text style={styles.metaDot}>·</Text>
+              <Repeat color="rgba(255,255,255,0.55)" size={11} />
+              <Text style={styles.metaText}>{t(`rec_${card.recurrence}`)}</Text>
+            </>
+          ) : null}
+          {card.reminder_minutes && card.reminder_minutes > 0 ? (
+            <>
+              <Text style={styles.metaDot}>·</Text>
+              <Bell color="rgba(255,255,255,0.55)" size={11} />
+              <Text style={styles.metaText}>
+                {card.reminder_minutes >= 1440
+                  ? `${Math.round(card.reminder_minutes / 1440)}d`
+                  : card.reminder_minutes >= 60
+                  ? `${Math.round(card.reminder_minutes / 60)}h`
+                  : `${card.reminder_minutes}m`}
+              </Text>
+            </>
+          ) : null}
         </View>
       </View>
 
@@ -179,7 +199,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   meta: { marginBottom: 14 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   metaText: {
     fontFamily: 'Inter_400Regular',
     fontSize: 12,

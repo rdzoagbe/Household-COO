@@ -1,9 +1,11 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
+import json as json_lib
 import logging
 import uuid
 import httpx
@@ -60,6 +62,8 @@ class Card(BaseModel):
     status: Literal["OPEN", "DONE"] = "OPEN"
     source: Literal["AI", "MANUAL", "VOICE", "CAMERA"] = "MANUAL"
     image_base64: Optional[str] = None
+    recurrence: Literal["none", "daily", "weekly", "monthly"] = "none"
+    reminder_minutes: int = 0  # 0 = no reminder; else minutes before due_date
     created_at: datetime
     completed_at: Optional[datetime] = None
 
@@ -72,6 +76,8 @@ class CardCreate(BaseModel):
     due_date: Optional[str] = None
     source: Literal["AI", "MANUAL", "VOICE", "CAMERA"] = "MANUAL"
     image_base64: Optional[str] = None
+    recurrence: Literal["none", "daily", "weekly", "monthly"] = "none"
+    reminder_minutes: int = 0
 
 
 class CardUpdate(BaseModel):
@@ -84,6 +90,34 @@ class FamilyMember(BaseModel):
     name: str
     role: str  # "Parent", "Child"
     avatar: Optional[str] = None
+    stars: int = 0
+
+
+class Reward(BaseModel):
+    reward_id: str
+    family_id: str
+    title: str
+    cost_stars: int
+    icon: Optional[str] = None
+    created_at: datetime
+
+
+class RewardCreate(BaseModel):
+    title: str
+    cost_stars: int
+    icon: Optional[str] = None
+
+
+class VisionInput(BaseModel):
+    image_base64: str  # data:image/jpeg;base64,... or raw base64
+
+
+class VisionDraft(BaseModel):
+    type: Literal["SIGN_SLIP", "RSVP", "TASK"]
+    title: str
+    description: str = ""
+    assignee: str = ""
+    due_date: Optional[str] = None
 
 
 class VaultDoc(BaseModel):
@@ -147,9 +181,9 @@ async def seed_family_data(family_id: str, user_name: str):
         return
 
     members = [
-        {"member_id": str(uuid.uuid4()), "family_id": family_id, "name": "Emma", "role": "Child", "avatar": None},
-        {"member_id": str(uuid.uuid4()), "family_id": family_id, "name": "Liam", "role": "Child", "avatar": None},
-        {"member_id": str(uuid.uuid4()), "family_id": family_id, "name": user_name, "role": "Parent", "avatar": None},
+        {"member_id": str(uuid.uuid4()), "family_id": family_id, "name": "Emma", "role": "Child", "avatar": None, "stars": 0},
+        {"member_id": str(uuid.uuid4()), "family_id": family_id, "name": "Liam", "role": "Child", "avatar": None, "stars": 0},
+        {"member_id": str(uuid.uuid4()), "family_id": family_id, "name": user_name, "role": "Parent", "avatar": None, "stars": 0},
     ]
     await db.family_members.insert_many(members)
 
@@ -345,6 +379,22 @@ async def list_cards(
     return [Card(**c) for c in cards]
 
 
+def _next_due_date(due_date_iso: Optional[str], recurrence: str) -> Optional[str]:
+    if not due_date_iso or recurrence == "none":
+        return None
+    try:
+        dt = datetime.fromisoformat(due_date_iso.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if recurrence == "daily":
+        dt = dt + timedelta(days=1)
+    elif recurrence == "weekly":
+        dt = dt + timedelta(days=7)
+    elif recurrence == "monthly":
+        dt = dt + timedelta(days=30)
+    return dt.isoformat()
+
+
 @api_router.post("/cards", response_model=Card)
 async def create_card(payload: CardCreate, user: User = Depends(get_current_user)):
     card = Card(
@@ -358,6 +408,8 @@ async def create_card(payload: CardCreate, user: User = Depends(get_current_user
         status="OPEN",
         source=payload.source,
         image_base64=payload.image_base64,
+        recurrence=payload.recurrence,
+        reminder_minutes=payload.reminder_minutes,
         created_at=datetime.now(timezone.utc),
         completed_at=None,
     )
@@ -376,7 +428,48 @@ async def update_card(card_id: str, payload: CardUpdate, user: User = Depends(ge
         update["completed_at"] = datetime.now(timezone.utc) if payload.status == "DONE" else None
     if update:
         await db.cards.update_one({"card_id": card_id}, {"$set": update})
+
+    # If recurring & marked DONE, spawn next instance
+    if payload.status == "DONE" and card_doc.get("recurrence", "none") != "none":
+        next_due = _next_due_date(card_doc.get("due_date"), card_doc["recurrence"])
+        if next_due:
+            next_card = {
+                "card_id": str(uuid.uuid4()),
+                "family_id": card_doc["family_id"],
+                "type": card_doc["type"],
+                "title": card_doc["title"],
+                "description": card_doc.get("description", ""),
+                "assignee": card_doc.get("assignee", ""),
+                "due_date": next_due,
+                "status": "OPEN",
+                "source": card_doc.get("source", "MANUAL"),
+                "image_base64": card_doc.get("image_base64"),
+                "recurrence": card_doc["recurrence"],
+                "reminder_minutes": card_doc.get("reminder_minutes", 0),
+                "created_at": datetime.now(timezone.utc),
+                "completed_at": None,
+            }
+            await db.cards.insert_one(next_card)
+
+    # Award stars if task is done by a Child assignee
+    stars_awarded = 0
+    if payload.status == "DONE" and card_doc["type"] == "TASK":
+        assignee_name = (card_doc.get("assignee") or "").strip()
+        if assignee_name:
+            member = await db.family_members.find_one(
+                {"family_id": user.family_id, "name": assignee_name, "role": "Child"},
+                {"_id": 0},
+            )
+            if member:
+                stars_awarded = 5
+                await db.family_members.update_one(
+                    {"member_id": member["member_id"]},
+                    {"$inc": {"stars": stars_awarded}},
+                )
+
     updated = await db.cards.find_one({"card_id": card_id}, {"_id": 0})
+    result = Card(**updated).dict()
+    # Note: stars_awarded returned via separate call (GET /family/members); keep response model stable
     return Card(**updated)
 
 
@@ -417,6 +510,160 @@ async def delete_vault_doc(doc_id: str, user: User = Depends(get_current_user)):
     if res.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Doc not found")
     return {"ok": True}
+
+
+# ============================================================
+# SUNDAY BRIEF (Gemini 3 Flash)
+# ============================================================
+@api_router.post("/vision/extract", response_model=VisionDraft)
+async def vision_extract(payload: VisionInput, user: User = Depends(get_current_user)):
+    """Send image (flyer/note) to Gemini vision → structured Smart Card draft."""
+    img = payload.image_base64 or ""
+    if not img.startswith("data:"):
+        img = f"data:image/jpeg;base64,{img}"
+
+    members_docs = await db.family_members.find({"family_id": user.family_id}, {"_id": 0}).to_list(50)
+    member_names = [m["name"] for m in members_docs]
+
+    system = (
+        "You extract a structured household task from a photo of a school flyer, note, invitation, or list. "
+        "Respond ONLY with a JSON object: "
+        "type (SIGN_SLIP | RSVP | TASK), title (max 80), description (max 200), "
+        "assignee (one name from family list or empty), due_date (ISO date string if a date is visible, else null). "
+        "Rules: SIGN_SLIP = permission slip / release form. RSVP = invitation/party. TASK = everything else. "
+        "Return JSON only, no markdown fences."
+    )
+    prompt = (
+        f"Family members: {', '.join(member_names) if member_names else 'none'}. "
+        "Extract the key action from the attached image."
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"vision_{user.user_id}_{uuid.uuid4().hex[:8]}",
+            system_message=system,
+        ).with_model("gemini", "gemini-3-flash-preview")
+        msg = UserMessage(text=prompt, file_contents=[ImageContent(image_base64=img)])
+        resp_text = str(await chat.send_message(msg)).strip()
+        if resp_text.startswith("```"):
+            resp_text = resp_text.strip("`")
+            if resp_text.lower().startswith("json"):
+                resp_text = resp_text[4:].strip()
+        data = json_lib.loads(resp_text)
+        t = (data.get("type") or "TASK").upper()
+        if t not in ("SIGN_SLIP", "RSVP", "TASK"):
+            t = "TASK"
+        return VisionDraft(
+            type=t,
+            title=(data.get("title") or "New item")[:80],
+            description=(data.get("description") or "")[:200],
+            assignee=(data.get("assignee") or "").strip(),
+            due_date=data.get("due_date"),
+        )
+    except Exception:
+        logging.exception("Vision error")
+        raise HTTPException(status_code=500, detail="Vision extraction failed")
+
+
+@api_router.get("/cards/conflicts", response_model=List[Card])
+async def card_conflicts(
+    due_date: str,
+    exclude_id: Optional[str] = None,
+    user: User = Depends(get_current_user),
+):
+    """Return OPEN cards whose due_date is within ±2h of the given ISO datetime."""
+    try:
+        target = datetime.fromisoformat(due_date.replace("Z", "+00:00"))
+        if target.tzinfo is None:
+            target = target.replace(tzinfo=timezone.utc)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid due_date")
+
+    docs = await db.cards.find(
+        {"family_id": user.family_id, "status": "OPEN", "due_date": {"$ne": None}},
+        {"_id": 0},
+    ).to_list(500)
+    conflicts = []
+    for d in docs:
+        if exclude_id and d["card_id"] == exclude_id:
+            continue
+        try:
+            dd = datetime.fromisoformat(str(d["due_date"]).replace("Z", "+00:00"))
+            if dd.tzinfo is None:
+                dd = dd.replace(tzinfo=timezone.utc)
+            delta = abs((dd - target).total_seconds())
+            if delta <= 2 * 3600:
+                conflicts.append(Card(**d))
+        except Exception:
+            continue
+    return conflicts
+
+
+# ============================================================
+# REWARDS
+# ============================================================
+@api_router.get("/rewards", response_model=List[Reward])
+async def list_rewards(user: User = Depends(get_current_user)):
+    docs = await db.rewards.find({"family_id": user.family_id}, {"_id": 0}).sort("cost_stars", 1).to_list(100)
+    return [Reward(**d) for d in docs]
+
+
+@api_router.post("/rewards", response_model=Reward)
+async def create_reward(payload: RewardCreate, user: User = Depends(get_current_user)):
+    r = Reward(
+        reward_id=str(uuid.uuid4()),
+        family_id=user.family_id,
+        title=payload.title,
+        cost_stars=max(1, int(payload.cost_stars)),
+        icon=payload.icon,
+        created_at=datetime.now(timezone.utc),
+    )
+    await db.rewards.insert_one(r.dict())
+    return r
+
+
+@api_router.delete("/rewards/{reward_id}")
+async def delete_reward(reward_id: str, user: User = Depends(get_current_user)):
+    res = await db.rewards.delete_one({"reward_id": reward_id, "family_id": user.family_id})
+    if res.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Reward not found")
+    return {"ok": True}
+
+
+class RedeemPayload(BaseModel):
+    member_id: str
+
+
+@api_router.post("/rewards/{reward_id}/redeem")
+async def redeem_reward(reward_id: str, payload: RedeemPayload, user: User = Depends(get_current_user)):
+    reward = await db.rewards.find_one({"reward_id": reward_id, "family_id": user.family_id}, {"_id": 0})
+    if not reward:
+        raise HTTPException(status_code=404, detail="Reward not found")
+    member = await db.family_members.find_one(
+        {"member_id": payload.member_id, "family_id": user.family_id}, {"_id": 0}
+    )
+    if not member:
+        raise HTTPException(status_code=404, detail="Member not found")
+    current = int(member.get("stars", 0))
+    if current < reward["cost_stars"]:
+        raise HTTPException(status_code=400, detail="Not enough stars")
+    await db.family_members.update_one(
+        {"member_id": payload.member_id},
+        {"$inc": {"stars": -reward["cost_stars"]}},
+    )
+    await db.reward_redemptions.insert_one({
+        "redemption_id": str(uuid.uuid4()),
+        "family_id": user.family_id,
+        "member_id": payload.member_id,
+        "reward_id": reward_id,
+        "title": reward["title"],
+        "cost_stars": reward["cost_stars"],
+        "redeemed_at": datetime.now(timezone.utc),
+    })
+    updated = await db.family_members.find_one({"member_id": payload.member_id}, {"_id": 0})
+    return {"ok": True, "member": FamilyMember(**updated).dict()}
 
 
 # ============================================================
@@ -479,6 +726,112 @@ async def weekly_brief(user: User = Depends(get_current_user)):
         )
 
     return BriefResponse(brief=brief_text, generated_at=datetime.now(timezone.utc))
+
+
+# ============================================================
+# VOICE → STT → CLASSIFY (Whisper + Gemini)
+# ============================================================
+class VoiceDraft(BaseModel):
+    transcript: str
+    type: Literal["SIGN_SLIP", "RSVP", "TASK"]
+    title: str
+    description: str = ""
+    assignee: str = ""
+
+
+@api_router.post("/voice/transcribe", response_model=VoiceDraft)
+async def voice_transcribe(
+    audio: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Receive audio blob → Whisper-1 transcription → Gemini classifier → card draft"""
+    raw = await audio.read()
+    if len(raw) == 0:
+        raise HTTPException(status_code=400, detail="Empty audio")
+    if len(raw) > 24 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Audio too large (max 24MB)")
+
+    # Determine extension from content type
+    ct = (audio.content_type or "").lower()
+    ext = "webm"
+    if "mp4" in ct or "m4a" in ct:
+        ext = "m4a"
+    elif "mpeg" in ct or "mp3" in ct:
+        ext = "mp3"
+    elif "wav" in ct:
+        ext = "wav"
+    elif "ogg" in ct:
+        ext = "ogg"
+
+    try:
+        from emergentintegrations.llm.openai import OpenAISpeechToText
+        stt = OpenAISpeechToText(api_key=EMERGENT_LLM_KEY)
+        bio = io.BytesIO(raw)
+        bio.name = f"voice.{ext}"
+        resp = await stt.transcribe(
+            file=bio,
+            model="whisper-1",
+            response_format="json",
+        )
+        transcript = (resp.text if hasattr(resp, "text") else str(resp)).strip()
+    except Exception:
+        logging.exception("STT error")
+        raise HTTPException(status_code=500, detail="Transcription failed")
+
+    if not transcript:
+        raise HTTPException(status_code=400, detail="No speech detected")
+
+    # Classify with Gemini into structured card
+    members_docs = await db.family_members.find({"family_id": user.family_id}, {"_id": 0}).to_list(50)
+    member_names = [m["name"] for m in members_docs]
+
+    classify_system = (
+        "You extract a structured household task from a parent's spoken note. "
+        "Respond ONLY with a compact JSON object with keys: "
+        "type (one of SIGN_SLIP, RSVP, TASK), title (short, max 80 chars), "
+        "description (optional context, max 200 chars), assignee (one name from the family list or empty string). "
+        "Rules: SIGN_SLIP = school permission/release forms. RSVP = party/event invitations. TASK = everything else. "
+        "No prose. No markdown. JSON only."
+    )
+    classify_prompt = (
+        f"Family members: {', '.join(member_names) if member_names else 'none'}.\n"
+        f"Spoken note: \"{transcript}\"\n\n"
+        "Return JSON now."
+    )
+
+    parsed = {
+        "type": "TASK",
+        "title": transcript[:80],
+        "description": "",
+        "assignee": "",
+    }
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(
+            api_key=EMERGENT_LLM_KEY,
+            session_id=f"voice_{user.user_id}_{uuid.uuid4().hex[:8]}",
+            system_message=classify_system,
+        ).with_model("gemini", "gemini-3-flash-preview")
+        resp_text = str(await chat.send_message(UserMessage(text=classify_prompt))).strip()
+        # Strip code fences if any
+        if resp_text.startswith("```"):
+            resp_text = resp_text.strip("`")
+            if resp_text.lower().startswith("json"):
+                resp_text = resp_text[4:].strip()
+        data = json_lib.loads(resp_text)
+        t = (data.get("type") or "TASK").upper()
+        if t not in ("SIGN_SLIP", "RSVP", "TASK"):
+            t = "TASK"
+        parsed = {
+            "type": t,
+            "title": (data.get("title") or transcript)[:80],
+            "description": (data.get("description") or "")[:200],
+            "assignee": (data.get("assignee") or "").strip(),
+        }
+    except Exception:
+        logging.exception("Classify error; falling back to raw transcript")
+
+    return VoiceDraft(transcript=transcript, **parsed)
 
 
 # ============================================================
