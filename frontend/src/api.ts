@@ -103,10 +103,10 @@ export interface VaultDoc {
 
 export const api = {
   // Auth
-  exchangeSession: (session_id: string) =>
+  exchangeSession: (session_id: string, invite_token?: string) =>
     request<{ user: User; session_token: string }>('/auth/session', {
       method: 'POST',
-      body: { session_id },
+      body: invite_token ? { session_id, invite_token } : { session_id },
     }),
   me: () => request<User>('/auth/me'),
   logout: () => request('/auth/logout', { method: 'POST' }),

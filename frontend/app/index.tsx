@@ -12,6 +12,30 @@ const BG_URL = 'https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-
 export default function Landing() {
   const { t, lang } = useStore();
   const [showLang, setShowLang] = useState(false);
+  const [invitedBy, setInvitedBy] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      const token = url.searchParams.get('invite');
+      if (token) {
+        try { window.sessionStorage.setItem('pending_invite', token); } catch { /* ignore */ }
+        // Fetch invite details for display
+        import('../src/api').then(({ api }) =>
+          api.getInvite(token).then((inv) => setInvitedBy(inv.inviter_name)).catch(() => {})
+        );
+      } else {
+        try {
+          const cached = window.sessionStorage.getItem('pending_invite');
+          if (cached) {
+            import('../src/api').then(({ api }) =>
+              api.getInvite(cached).then((inv) => setInvitedBy(inv.inviter_name)).catch(() => {})
+            );
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  }, []);
 
   const signIn = () => {
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
@@ -46,6 +70,14 @@ export default function Landing() {
             <Sparkles color="#fff" size={12} />
             <Text style={styles.badgeText}>{t('app_name')}</Text>
           </View>
+          {invitedBy ? (
+            <View style={styles.inviteBanner} testID="invite-banner">
+              <Text style={styles.inviteText}>
+                <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold' }}>{invitedBy}</Text>
+                {' invited you to their Household COO.'}
+              </Text>
+            </View>
+          ) : null}
           <Text style={styles.heading}>{t('tagline')}</Text>
           <Text style={styles.sub}>{t('subtitle')}</Text>
 
@@ -125,6 +157,23 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   badgeText: { color: '#fff', fontFamily: 'Inter_500Medium', fontSize: 11, letterSpacing: 0.5 },
+  inviteBanner: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(249,115,22,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(249,115,22,0.35)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    marginBottom: 16,
+    maxWidth: 380,
+  },
+  inviteText: {
+    color: 'rgba(255,255,255,0.85)',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 13,
+    lineHeight: 19,
+  },
   heading: {
     fontFamily: 'PlayfairDisplay_400Regular_Italic',
     color: '#fff',

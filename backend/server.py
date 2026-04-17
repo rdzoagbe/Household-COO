@@ -24,6 +24,9 @@ client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY', '')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'onboarding@resend.dev')
+PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'https://ai-household.preview.emergentagent.com')
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -110,6 +113,24 @@ class RewardCreate(BaseModel):
 
 class VisionInput(BaseModel):
     image_base64: str  # data:image/jpeg;base64,... or raw base64
+
+
+class InviteCreate(BaseModel):
+    email: str
+
+
+class InvitePublic(BaseModel):
+    token: str
+    family_id: str
+    inviter_name: str
+    inviter_email: str
+    email: str
+    used: bool
+
+
+class InviteAcceptParams(BaseModel):
+    session_id: str
+    invite_token: Optional[str] = None
 
 
 class VisionDraft(BaseModel):
@@ -263,9 +284,10 @@ async def seed_family_data(family_id: str, user_name: str):
 # ============================================================
 @api_router.post("/auth/session")
 async def create_session(request: Request, response: Response):
-    """Exchange Emergent Auth session_id for a persistent session"""
+    """Exchange Emergent Auth session_id for a persistent session. Accepts optional invite_token."""
     body = await request.json()
     session_id = body.get("session_id")
+    invite_token = body.get("invite_token")
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id required")
 
@@ -284,6 +306,14 @@ async def create_session(request: Request, response: Response):
     picture = data.get("picture")
     session_token = data["session_token"]
 
+    # Resolve invite (if any) to target family
+    invited_family_id = None
+    invite_doc = None
+    if invite_token:
+        invite_doc = await db.invites.find_one({"token": invite_token, "used_at": None}, {"_id": 0})
+        if invite_doc:
+            invited_family_id = invite_doc["family_id"]
+
     # Upsert user
     existing_user = await db.users.find_one({"email": email}, {"_id": 0})
     if existing_user:
@@ -293,20 +323,48 @@ async def create_session(request: Request, response: Response):
             {"user_id": user_id},
             {"$set": {"name": name, "picture": picture}}
         )
+        # If existing user accepts invite, we don't silently move them — ignore for safety
     else:
         user_id = f"user_{uuid.uuid4().hex[:12]}"
-        family_id = f"family_{uuid.uuid4().hex[:12]}"
-        new_user = {
-            "user_id": user_id,
-            "email": email,
-            "name": name,
-            "picture": picture,
-            "family_id": family_id,
-            "language": "en",
-            "created_at": datetime.now(timezone.utc),
-        }
-        await db.users.insert_one(new_user)
-        await seed_family_data(family_id, name)
+        if invited_family_id:
+            family_id = invited_family_id
+            new_user = {
+                "user_id": user_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "family_id": family_id,
+                "language": "en",
+                "created_at": datetime.now(timezone.utc),
+            }
+            await db.users.insert_one(new_user)
+            # Add them as a Parent member in the existing family (don't seed new data)
+            await db.family_members.insert_one({
+                "member_id": str(uuid.uuid4()),
+                "family_id": family_id,
+                "name": name,
+                "role": "Parent",
+                "avatar": picture,
+                "stars": 0,
+            })
+            # Mark invite used
+            await db.invites.update_one(
+                {"token": invite_token},
+                {"$set": {"used_at": datetime.now(timezone.utc), "accepted_by_user_id": user_id}},
+            )
+        else:
+            family_id = f"family_{uuid.uuid4().hex[:12]}"
+            new_user = {
+                "user_id": user_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "family_id": family_id,
+                "language": "en",
+                "created_at": datetime.now(timezone.utc),
+            }
+            await db.users.insert_one(new_user)
+            await seed_family_data(family_id, name)
 
     # Store session
     await db.user_sessions.insert_one({
@@ -316,7 +374,6 @@ async def create_session(request: Request, response: Response):
         "created_at": datetime.now(timezone.utc),
     })
 
-    # Set cookie
     response.set_cookie(
         key="session_token",
         value=session_token,
@@ -362,6 +419,107 @@ async def update_language(payload: LanguageUpdate, user: User = Depends(get_curr
 async def get_family_members(user: User = Depends(get_current_user)):
     members = await db.family_members.find({"family_id": user.family_id}, {"_id": 0}).to_list(100)
     return [FamilyMember(**m) for m in members]
+
+
+@api_router.post("/family/invite")
+async def create_family_invite(payload: InviteCreate, user: User = Depends(get_current_user)):
+    """Create an invite and email the join link via Resend."""
+    email = (payload.email or "").strip().lower()
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="Valid email required")
+
+    token = uuid.uuid4().hex
+    invite = {
+        "token": token,
+        "family_id": user.family_id,
+        "inviter_user_id": user.user_id,
+        "inviter_name": user.name,
+        "inviter_email": user.email,
+        "email": email,
+        "created_at": datetime.now(timezone.utc),
+        "used_at": None,
+        "accepted_by_user_id": None,
+    }
+    await db.invites.insert_one(invite)
+
+    join_url = f"{PUBLIC_APP_URL}/?invite={token}"
+    sent = False
+    err_detail = None
+
+    if RESEND_API_KEY:
+        subject = f"{user.name} invited you to their Household COO"
+        html = f"""
+<!doctype html>
+<html><body style="margin:0;padding:0;background:#080910;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080910;padding:40px 20px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#111218;border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:40px;">
+        <tr><td>
+          <p style="margin:0 0 8px 0;color:#6366F1;font-size:12px;letter-spacing:2px;text-transform:uppercase;">Household COO</p>
+          <h1 style="margin:0 0 18px 0;color:#ffffff;font-size:30px;font-weight:400;font-style:italic;font-family:Georgia,'Times New Roman',serif;line-height:36px;">
+            {user.name} wants you on the family team.
+          </h1>
+          <p style="margin:0 0 28px 0;color:rgba(255,255,255,0.7);font-size:15px;line-height:24px;">
+            Join <strong style="color:#fff;">{user.name}</strong>'s Household COO — a shared command center for school flyers,
+            RSVPs, permission slips, and everything else that used to pile up.
+          </p>
+          <a href="{join_url}" style="display:inline-block;background:#ffffff;color:#080910;padding:14px 26px;border-radius:9999px;text-decoration:none;font-weight:600;font-size:15px;">
+            Accept invitation →
+          </a>
+          <p style="margin:28px 0 0 0;color:rgba(255,255,255,0.35);font-size:11px;line-height:18px;">
+            Or paste this link: <a href="{join_url}" style="color:rgba(255,255,255,0.5);">{join_url}</a>
+          </p>
+        </td></tr>
+      </table>
+      <p style="margin:20px 0 0 0;color:rgba(255,255,255,0.3);font-size:11px;">
+        Sent from Household COO. If this wasn't you, ignore this email.
+      </p>
+    </td></tr>
+  </table>
+</body></html>
+"""
+        try:
+            async with httpx.AsyncClient() as http_client:
+                r = await http_client.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {RESEND_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "from": f"Household COO <{RESEND_FROM_EMAIL}>",
+                        "to": [email],
+                        "subject": subject,
+                        "html": html,
+                    },
+                    timeout=15.0,
+                )
+                sent = r.status_code in (200, 202)
+                if not sent:
+                    err_detail = f"Resend {r.status_code}: {r.text[:200]}"
+        except Exception as e:
+            err_detail = str(e)
+            logging.exception("Resend error")
+    else:
+        err_detail = "RESEND_API_KEY not configured"
+
+    return {"ok": True, "sent": sent, "token": token, "join_url": join_url, "error": err_detail}
+
+
+@api_router.get("/family/invite/{token}", response_model=InvitePublic)
+async def get_invite(token: str):
+    """Public endpoint — landing page uses this to show 'X invited you to their family'."""
+    doc = await db.invites.find_one({"token": token}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    return InvitePublic(
+        token=doc["token"],
+        family_id=doc["family_id"],
+        inviter_name=doc["inviter_name"],
+        inviter_email=doc["inviter_email"],
+        email=doc["email"],
+        used=doc.get("used_at") is not None,
+    )
 
 
 # ============================================================

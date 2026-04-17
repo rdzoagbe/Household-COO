@@ -32,8 +32,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
           const sessionId = match ? match[1] : null;
           if (sessionId) {
             try {
-              const res = await api.exchangeSession(sessionId);
+              let inviteToken: string | undefined = undefined;
+              try {
+                const pending = window.sessionStorage.getItem('pending_invite');
+                if (pending) inviteToken = pending;
+              } catch { /* ignore */ }
+              const res = await api.exchangeSession(sessionId, inviteToken);
               await setUserFromAuth(res.user, res.session_token);
+              try { window.sessionStorage.removeItem('pending_invite'); } catch { /* ignore */ }
               // clean url
               window.history.replaceState(null, '', window.location.pathname);
             } catch (e) {
