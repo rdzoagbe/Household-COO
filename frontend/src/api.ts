@@ -1,0 +1,120 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+
+const TOKEN_KEY = 'coo_session_token';
+
+export const tokenStore = {
+  async get(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(TOKEN_KEY);
+    } catch {
+      return null;
+    }
+  },
+  async set(token: string) {
+    await AsyncStorage.setItem(TOKEN_KEY, token);
+  },
+  async clear() {
+    await AsyncStorage.removeItem(TOKEN_KEY);
+  },
+};
+
+async function request<T = any>(
+  path: string,
+  opts: { method?: string; body?: any } = {}
+): Promise<T> {
+  const token = await tokenStore.get();
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE}/api${path}`, {
+    method: opts.method || 'GET',
+    headers,
+    credentials: 'include',
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status}: ${text}`);
+  }
+  if (res.status === 204) return {} as T;
+  return res.json();
+}
+
+export type CardType = 'SIGN_SLIP' | 'RSVP' | 'TASK';
+export type CardStatus = 'OPEN' | 'DONE';
+
+export interface Card {
+  card_id: string;
+  family_id: string;
+  type: CardType;
+  title: string;
+  description?: string;
+  assignee?: string;
+  due_date?: string | null;
+  status: CardStatus;
+  source: 'AI' | 'MANUAL' | 'VOICE' | 'CAMERA';
+  image_base64?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+}
+
+export interface User {
+  user_id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  family_id: string;
+  language: string;
+}
+
+export interface FamilyMember {
+  member_id: string;
+  family_id: string;
+  name: string;
+  role: string;
+  avatar?: string | null;
+}
+
+export interface VaultDoc {
+  doc_id: string;
+  family_id: string;
+  title: string;
+  category: string;
+  image_base64: string;
+  created_at: string;
+}
+
+export const api = {
+  // Auth
+  exchangeSession: (session_id: string) =>
+    request<{ user: User; session_token: string }>('/auth/session', {
+      method: 'POST',
+      body: { session_id },
+    }),
+  me: () => request<User>('/auth/me'),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  setLanguage: (language: string) =>
+    request('/auth/language', { method: 'PATCH', body: { language } }),
+  // Family
+  familyMembers: () => request<FamilyMember[]>('/family/members'),
+  // Cards
+  listCards: (status?: string) =>
+    request<Card[]>(`/cards${status ? `?status=${status}` : ''}`),
+  createCard: (data: Partial<Card>) =>
+    request<Card>('/cards', { method: 'POST', body: data }),
+  updateCard: (id: string, data: { status?: CardStatus }) =>
+    request<Card>(`/cards/${id}`, { method: 'PATCH', body: data }),
+  deleteCard: (id: string) => request(`/cards/${id}`, { method: 'DELETE' }),
+  // Vault
+  listVault: () => request<VaultDoc[]>('/vault'),
+  createVaultDoc: (data: { title: string; category: string; image_base64: string }) =>
+    request<VaultDoc>('/vault', { method: 'POST', body: data }),
+  deleteVaultDoc: (id: string) => request(`/vault/${id}`, { method: 'DELETE' }),
+  // Brief
+  weeklyBrief: () =>
+    request<{ brief: string; generated_at: string }>('/brief/weekly', { method: 'POST' }),
+};
