@@ -1,0 +1,119 @@
+{
+  "theme": "dark",
+  "archetype": "Archetype 5 (Jewel & Luxury) blended with Dark Glassmorphism",
+  "emotional_tone": "Premium, Calming, Secure, Intelligent, Reducing Mental Load",
+  "design_principles": [
+    "Glassmorphism aesthetic with deep void background.",
+    "Evocative typography pairing for a premium 'Chief of Staff' feel.",
+    "Micro-interactions on every tap (scale) and page load (fade/scale).",
+    "Absolute clarity in data hierarchy, using specific colors to indicate the 'action' type.",
+    "Mobile-first, using Expo specific libraries and precise Safe Area handling."
+  ],
+  "colors": {
+    "background": {
+      "primary": "#080910",
+      "glow_indigo": "rgba(99, 102, 241, 0.15)",
+      "glow_orange": "rgba(249, 115, 22, 0.1)",
+      "glow_emerald": "rgba(16, 185, 129, 0.1)"
+    },
+    "surface": {
+      "glass_light": "rgba(255, 255, 255, 0.05)",
+      "glass_medium": "rgba(255, 255, 255, 0.08)",
+      "glass_border": "rgba(255, 255, 255, 0.1)",
+      "card_shadow": "rgba(0, 0, 0, 0.5)"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "rgba(255, 255, 255, 0.7)",
+      "tertiary": "rgba(255, 255, 255, 0.4)",
+      "inverse": "#000000"
+    },
+    "categories": {
+      "sign_slip": "#F97316",
+      "rsvp": "#6366F1",
+      "task": "#10B981"
+    },
+    "actions": {
+      "primary": "#FFFFFF",
+      "danger": "#EF4444"
+    }
+  },
+  "typography": {
+    "libraries_required": [
+      "@expo-google-fonts/playfair-display",
+      "@expo-google-fonts/inter"
+    ],
+    "families": {
+      "heading": "PlayfairDisplay_400Regular_Italic",
+      "body": "Inter_400Regular",
+      "body_medium": "Inter_500Medium",
+      "body_bold": "Inter_600SemiBold"
+    },
+    "sizes": {
+      "h1": 36,
+      "h2": 28,
+      "h3": 22,
+      "h4": 18,
+      "body_lg": 16,
+      "body": 14,
+      "caption": 12,
+      "tiny": 10
+    }
+  },
+  "layout_and_spacing": {
+    "viewport": "390x844 (iPhone 14 base reference)",
+    "safe_area": "Required for all screens, specifically top padding for headers and bottom padding to avoid the floating action bar.",
+    "padding": {
+      "screen": 24,
+      "card": 20,
+      "element": 16,
+      "small": 8
+    },
+    "border_radius": {
+      "lg": 24,
+      "md": 16,
+      "sm": 8,
+      "pill": 9999
+    }
+  },
+  "components_guidelines": {
+    "backgrounds": "Use View with backgroundColor '#080910'. Use 'expo-linear-gradient' absolute positioned in corners for radial-like glows.",
+    "cards_smart_feed": "Use 'expo-blur' BlurView with intensity={20} to 30, tint='dark'. Wrapper must have borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 24, and shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.5, shadowRadius: 16. Inner content should prominently display category indicator (Orange, Indigo, Emerald).",
+    "floating_action_bar": "Absolute positioned at the bottom. Glassmorphism pill shape. Central prominent 'Camera' button (slightly elevated), flanked by 'Mic' and 'Manual Entry' buttons. Use lucide-react-native icons.",
+    "sunday_brief_modal": "Full screen overlay. Background uses the generated 'ai_sunday_brief_bg' image with a dark overlay and high BlurView intensity. Text should be large Playfair Display headings with Inter data points.",
+    "buttons": "All touchables must use Animated API or react-native-reanimated for a slight scale down on onPressIn and scale back on onPressOut. Primary buttons should have a solid glass background or subtle gradient.",
+    "icons": "Use 'lucide-react-native'. Color should map to the semantic category or text secondary.",
+    "testing": "All interactive elements must have a 'testID' prop (equivalent to data-testid in web)."
+  },
+  "animations": {
+    "screen_transitions": "Fade and slightly scale in content upon mount.",
+    "interactions": "Scale button to 0.95 on press. Smooth spring release."
+  },
+  "image_urls": {
+    "onboarding_bg": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-4e7f-a0c1-6a43a75126d3/images/6b243a1cf4a6ac9e40857ce24db4ef57d5831d303169f63507bb73111fe11fac.png",
+      "description": "Premium dark mesh gradient for the Google Sign-in onboarding background."
+    },
+    "ai_sunday_brief_bg": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-4e7f-a0c1-6a43a75126d3/images/c54dfb594feff59886f35731ad1a1d593ce3d04827e4d753eab304e381593173.png",
+      "description": "Abstract glowing orb background for the AI Sunday Brief."
+    },
+    "user_avatar": {
+      "url": "https://images.unsplash.com/photo-1762522928601-862bf2a04902?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1Nzl8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjB3b21hbiUyMHBvcnRyYWl0JTIwc21pbGluZ3xlbnwwfHx8fDE3NzY0MzUxODZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Avatar for the primary 'COO' user (Settings, Header)."
+    },
+    "family_avatar_child": {
+      "url": "https://images.unsplash.com/photo-1709122066713-4c904721a378?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwxfHxzbWlsaW5nJTIwZmFtaWx5JTIwcG9ydHJhaXQlMjBkYXJrJTIwYmFja2dyb3VuZHxlbnwwfHx8fDE3NzY0MzUxODZ8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Avatar for a family member profile in settings/feed."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use ONLY Expo/React Native components (View, Text, TouchableOpacity, ScrollView, Image, Modal, SafeAreaView). DO NOT USE HTML elements.",
+    "Do not use Tailwind CSS. Implement all styling using StyleSheet.create().",
+    "Install and use 'expo-blur' for the glass cards and floating action bar.",
+    "Install and use 'expo-linear-gradient' for the background glows.",
+    "Install and use '@expo-google-fonts/playfair-display' (italic) and '@expo-google-fonts/inter'. Ensure fonts are loaded before rendering.",
+    "Implement a Bottom Tab navigator structure natively or manually, but remember the Bottom Action Bar with Mic/Camera floats OVER the tabs.",
+    "Remember to include 'testID' attributes on all touchables."
+  ]
+}
