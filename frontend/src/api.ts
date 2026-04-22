@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const BASE = "https://your-backend-service-name.up.railway.app"; // NEW;
 
 const TOKEN_KEY = 'coo_session_token';
 
