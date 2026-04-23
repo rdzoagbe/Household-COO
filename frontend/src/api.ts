@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://ai-household.preview.emergentagent.com";
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL;
+if (!BASE) {
+  throw new Error("EXPO_PUBLIC_BACKEND_URL is not set");
+}
 
 const TOKEN_KEY = 'coo_session_token';
 

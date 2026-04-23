@@ -85,7 +85,7 @@ export default function Landing() {
         // ignore
       }
 
-      const res = await (await import('../src/api')).api.exchangeSession(sessionId, inviteToken);
+      const res = await (await import('../src/api')).api.exchangeSession(sessionId);
       await setUserFromAuth(res.user, res.session_token);
       router.replace('/(tabs)/feed');
     } catch (error) {
