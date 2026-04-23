@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Platform, ImageBackground } from 'react-native';
+import { View, Text, StyleSheet, Platform, ImageBackground, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { Globe, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { AmbientBackground } from '../src/components/AmbientBackground';
 import { PressScale } from '../src/components/PressScale';
@@ -11,7 +13,7 @@ import { useStore } from '../src/store';
 const BG_URL = 'https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-4e7f-a0c1-6a43a75126d3/images/6b243a1cf4a6ac9e40857ce24db4ef57d5831d303169f63507bb73111fe11fac.png';
 
 export default function Landing() {
-  const { t, lang } = useStore();
+  const { t, lang, setUserFromAuth } = useStore();
   const router = useRouter();
   const [showLang, setShowLang] = useState(false);
   const [invitedBy, setInvitedBy] = React.useState<string | null>(null);
@@ -39,13 +41,56 @@ export default function Landing() {
     }
   }, []);
 
-  const signIn = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+  const extractSessionId = (rawUrl: string) => {
+    try {
+      const queryUrl = new URL(rawUrl.replace('#', '?'));
+      return queryUrl.searchParams.get('session_id');
+    } catch {
+      const match = rawUrl.match(/[?#&]session_id=([^&#]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+  };
+
+  const signIn = async () => {
+    const authBase = 'https://auth.emergentagent.com/';
+
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const redirectUrl = window.location.origin + '/';
-      window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(
-        redirectUrl
-      )}`;
+      window.location.href = `${authBase}?redirect=${encodeURIComponent(redirectUrl)}`;
+      return;
+    }
+
+    try {
+      const redirectUrl = Linking.createURL('/');
+      const authUrl = `${authBase}?redirect=${encodeURIComponent(redirectUrl)}`;
+      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+
+      if (result.type !== 'success' || !result.url) {
+        return;
+      }
+
+      const sessionId = extractSessionId(result.url);
+      if (!sessionId) {
+        Alert.alert('Sign-in failed', 'No session was returned from the sign-in flow.');
+        return;
+      }
+
+      let inviteToken: string | undefined = undefined;
+      try {
+        if (typeof window !== 'undefined') {
+          const pending = window.sessionStorage.getItem('pending_invite');
+          if (pending) inviteToken = pending;
+        }
+      } catch {
+        // ignore
+      }
+
+      const res = await (await import('../src/api')).api.exchangeSession(sessionId, inviteToken);
+      await setUserFromAuth(res.user, res.session_token);
+      router.replace('/(tabs)/feed');
+    } catch (error) {
+      console.error('native sign-in failed', error);
+      Alert.alert('Sign-in failed', 'Please try again.');
     }
   };
 
