@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE = "https://your-backend-service-name.up.railway.app"; // NEW;
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || "https://ai-household.preview.emergentagent.com";
 
 const TOKEN_KEY = 'coo_session_token';
 
@@ -160,6 +160,13 @@ export const api = {
   logout: () => request('/auth/logout', { method: 'POST' }),
   setLanguage: (language: string) =>
     request('/auth/language', { method: 'PATCH', body: { language } }),
+  invite: (email: string) =>
+    request<{ sent: boolean; error?: string; invite_url?: string }>('/family/invite', {
+      method: 'POST',
+      body: { email },
+    }),
+  getInvite: (token: string) =>
+    request<{ inviter_name: string; email?: string }>(`/family/invite/${token}`),
   // Family
   familyMembers: () => request<FamilyMember[]>('/family/members'),
   setMemberPin: (member_id: string, pin: string) =>
