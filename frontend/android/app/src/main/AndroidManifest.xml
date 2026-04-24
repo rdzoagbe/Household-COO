@@ -28,6 +28,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="householdcoo"/>
+        <data android:scheme="exp+household-coo"/>
       </intent-filter>
     </activity>
   </application>
