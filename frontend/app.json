@@ -29,7 +29,22 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "intentFilters": [
+  {
+    "action": "VIEW",
+    "autoVerify": false,
+    "data": [
+      {
+        "scheme": "householdcoo"
+      },
+      {
+        "scheme": "com.householdcoo.app"
+      }
+    ],
+    "category": ["BROWSABLE", "DEFAULT"]
+  }
+]
     },
     "web": {
       "bundler": "metro",

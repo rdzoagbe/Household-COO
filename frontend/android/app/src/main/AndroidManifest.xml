@@ -30,6 +30,13 @@
         <data android:scheme="householdcoo"/>
         <data android:scheme="exp+household-coo"/>
       </intent-filter>
+      <intent-filter data-generated="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <data android:scheme="householdcoo"/>
+        <data android:scheme="com.householdcoo.app"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>
