@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Platform, ImageBackground, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
 import { Globe, Sparkles, ShieldCheck } from 'lucide-react-native';
 import { AmbientBackground } from '../src/components/AmbientBackground';
 import { PressScale } from '../src/components/PressScale';
 import { LanguageModal } from '../src/components/LanguageModal';
 import { useStore } from '../src/store';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
+
+WebBrowser.maybeCompleteAuthSession();
 
 const BG_URL = 'https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-4e7f-a0c1-6a43a75126d3/images/6b243a1cf4a6ac9e40857ce24db4ef57d5831d303169f63507bb73111fe11fac.png';
 
@@ -16,81 +18,44 @@ export default function Landing() {
   const { t, lang, setUserFromAuth } = useStore();
   const router = useRouter();
   const [showLang, setShowLang] = useState(false);
-  const [invitedBy, setInvitedBy] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      const token = url.searchParams.get('invite');
-      if (token) {
-        try { window.sessionStorage.setItem('pending_invite', token); } catch { /* ignore */ }
-        // Fetch invite details for display
-        import('../src/api').then(({ api }) =>
-          api.getInvite(token).then((inv) => setInvitedBy(inv.inviter_name)).catch(() => {})
-        );
-      } else {
-        try {
-          const cached = window.sessionStorage.getItem('pending_invite');
-          if (cached) {
-            import('../src/api').then(({ api }) =>
-              api.getInvite(cached).then((inv) => setInvitedBy(inv.inviter_name)).catch(() => {})
-            );
-          }
-        } catch { /* ignore */ }
+  const [request, response, promptAsync] = Google.useIdTokenAuthRequest(
+    {
+      clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+      redirectUri: ''
+    }
+  );
+
+  useEffect(() => {
+    const handle = async () => {
+      if (response?.type !== 'success') return;
+
+      try {
+        const idToken = response.params?.id_token;
+        if (!idToken) {
+          Alert.alert('Sign-in failed', 'Google did not return an ID token.');
+          return;
+        }
+
+        const { api } = await import('../src/api');
+        const res = await api.exchangeSession(idToken);
+        await setUserFromAuth(res.user, res.session_token);
+        router.replace('/(tabs)/feed');
+      } catch (error: any) {
+        console.error('google sign-in exchange failed', error);
+        Alert.alert('Sign-in failed', error?.message || 'Please try again.');
       }
-    }
-  }, []);
+    };
 
-  const extractSessionId = (rawUrl: string) => {
-    try {
-      const queryUrl = new URL(rawUrl.replace('#', '?'));
-      return queryUrl.searchParams.get('session_id');
-    } catch {
-      const match = rawUrl.match(/[?#&]session_id=([^&#]+)/);
-      return match ? decodeURIComponent(match[1]) : null;
-    }
-  };
+    handle();
+  }, [response, router, setUserFromAuth]);
 
   const signIn = async () => {
-    const authBase = 'https://auth.emergentagent.com/';
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const redirectUrl = window.location.origin + '/';
-      window.location.href = `${authBase}?redirect=${encodeURIComponent(redirectUrl)}`;
-      return;
-    }
-
     try {
-      const redirectUrl = Linking.createURL('/');
-      const authUrl = `${authBase}?redirect=${encodeURIComponent(redirectUrl)}`;
-      const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-
-      if (result.type !== 'success' || !result.url) {
-        return;
-      }
-
-      const sessionId = extractSessionId(result.url);
-      if (!sessionId) {
-        Alert.alert('Sign-in failed', 'No session was returned from the sign-in flow.');
-        return;
-      }
-
-      let inviteToken: string | undefined = undefined;
-      try {
-        if (typeof window !== 'undefined') {
-          const pending = window.sessionStorage.getItem('pending_invite');
-          if (pending) inviteToken = pending;
-        }
-      } catch {
-        // ignore
-      }
-
-      const res = await (await import('../src/api')).api.exchangeSession(sessionId);
-      await setUserFromAuth(res.user, res.session_token);
-      router.replace('/(tabs)/feed');
-    } catch (error) {
-      console.error('native sign-in failed', error);
-      Alert.alert('Sign-in failed', 'Please try again.');
+      await promptAsync();
+    } catch (error: any) {
+      console.error('google prompt failed', error);
+      Alert.alert('Sign-in failed', error?.message || 'Please try again.');
     }
   };
 
@@ -117,18 +82,15 @@ export default function Landing() {
             <Sparkles color="#fff" size={12} />
             <Text style={styles.badgeText}>{t('app_name')}</Text>
           </View>
-          {invitedBy ? (
-            <View style={styles.inviteBanner} testID="invite-banner">
-              <Text style={styles.inviteText}>
-                <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold' }}>{invitedBy}</Text>
-                {' invited you to their Household COO.'}
-              </Text>
-            </View>
-          ) : null}
+
           <Text style={styles.heading}>{t('tagline')}</Text>
           <Text style={styles.sub}>{t('subtitle')}</Text>
 
-          <PressScale testID="google-signin" onPress={signIn} style={styles.cta}>
+          <PressScale
+            testID="google-signin"
+            onPress={signIn}
+            style={[styles.cta, !request && { opacity: 0.6 }]}
+          >
             <View style={styles.googleDot}>
               <Text style={{ fontWeight: '700', color: '#4285F4' }}>G</Text>
             </View>
@@ -159,43 +121,25 @@ export default function Landing() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#080910' },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,9,16,0.55)' },
-  safe: { flex: 1, paddingHorizontal: 28 },
-  top: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 9999,
-    backgroundColor: '#10B981',
-    shadowColor: '#10B981',
-    shadowOpacity: 0.9,
-    shadowRadius: 10,
-  },
-  logoText: {
-    color: '#fff',
-    fontFamily: 'Inter_600SemiBold',
-    letterSpacing: 3,
-    fontSize: 13,
-  },
+  container: { flex: 1, backgroundColor: '#0c0c0c' },
+  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)' },
+  safe: { flex: 1, paddingHorizontal: 22, justifyContent: 'space-between' },
+  top: { paddingTop: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoDot: { width: 10, height: 10, borderRadius: 999, backgroundColor: '#f59e0b' },
+  logoText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
   langBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 7,
-    borderRadius: 9999,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  langText: { color: 'rgba(255,255,255,0.8)', fontFamily: 'Inter_500Medium', fontSize: 11, letterSpacing: 1 },
+  langText: { color: 'rgba(255,255,255,0.85)', fontFamily: 'Inter_500Medium', fontSize: 12 },
   center: { flex: 1, justifyContent: 'center' },
   badge: {
     alignSelf: 'flex-start',
@@ -211,23 +155,6 @@ const styles = StyleSheet.create({
     marginBottom: 22,
   },
   badgeText: { color: '#fff', fontFamily: 'Inter_500Medium', fontSize: 11, letterSpacing: 0.5 },
-  inviteBanner: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(249,115,22,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(249,115,22,0.35)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginBottom: 16,
-    maxWidth: 380,
-  },
-  inviteText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    lineHeight: 19,
-  },
   heading: {
     fontFamily: 'PlayfairDisplay_400Regular_Italic',
     color: '#fff',

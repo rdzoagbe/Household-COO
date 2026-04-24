@@ -26,57 +26,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [processingSession, setProcessingSession] = React.useState(true);
 
-  // Process session_id from URL fragment (Emergent Auth callback) -- web only
-  useEffect(() => {
-    const handle = async () => {
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const hash = window.location.hash || '';
-        if (hash.includes('session_id=')) {
-          const match = hash.match(/session_id=([^&]+)/);
-          const sessionId = match ? match[1] : null;
-          if (sessionId) {
-            try {
-              let inviteToken: string | undefined = undefined;
-              try {
-                const pending = window.sessionStorage.getItem('pending_invite');
-                if (pending) inviteToken = pending;
-              } catch { /* ignore */ }
-              const res = await api.exchangeSession(sessionId, inviteToken);
-              await setUserFromAuth(res.user, res.session_token);
-              try { window.sessionStorage.removeItem('pending_invite'); } catch { /* ignore */ }
-              // clean url
-              window.history.replaceState(null, '', window.location.pathname);
-              // honor post-auth redirect
-              try {
-                const dest = window.sessionStorage.getItem('post_auth_redirect');
-                if (dest) {
-                  window.sessionStorage.removeItem('post_auth_redirect');
-                  router.replace(dest as any);
-                  setProcessingSession(false);
-                  return;
-                }
-              } catch { /* ignore */ }
-            } catch (e) {
-              console.log('session exchange failed', e);
-              await tokenStore.clear();
-            }
-          }
-        }
-      }
-      setProcessingSession(false);
-    };
-    handle();
-  }, [setUserFromAuth, router]);
 
   useEffect(() => {
     if (loading || processingSession) return;
     const inTabs = segments[0] === '(tabs)';
     const isPublic = PUBLIC_ROUTES.includes(segments[0] as string);
+    const segmentCount = segments.length as number;
     if (!user && inTabs) {
       router.replace('/');
-    } else if (user && !inTabs && !isPublic && segments.length > 0 && segments[0] !== 'index') {
+    } else if (user && !inTabs && !isPublic && segmentCount > 0) {
       // authenticated user on a non-tab screen that isn't public -- leave alone
-    } else if (user && segments.length === 0) {
+    } else if (user && segmentCount === 0) {
       router.replace('/(tabs)/feed');
     }
   }, [user, loading, processingSession, segments, router]);
