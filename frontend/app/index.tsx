@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import * as AuthSession from 'expo-auth-session';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -11,13 +12,18 @@ export default function Landing() {
 
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const redirectUri = AuthSession.makeRedirectUri({
+  native: 'householdcoo://auth',
+});
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     androidClientId,
     webClientId,
+    redirectUri,
   });
 
   useEffect(() => {
+  console.log('Google redirectUri:', redirectUri);
   console.log('Google webClientId:', webClientId);
   console.log('Google androidClientId:', androidClientId);
   console.log('Google auth request:', request);
