@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
-import * as AuthSession from 'expo-auth-session';
 import { View, Text, StyleSheet, Pressable, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import * as Google from 'expo-auth-session/providers/google';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -12,30 +12,60 @@ export default function Landing() {
 
   const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
-  const redirectUri = AuthSession.makeRedirectUri({
-  native: 'householdcoo://auth',
-});
 
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
+  const [request, response, promptAsync] = Google.useAuthRequest({
     androidClientId,
     webClientId,
-    redirectUri,
   });
 
   useEffect(() => {
-  console.log('Google redirectUri:', redirectUri);
-  console.log('Google webClientId:', webClientId);
-  console.log('Google androidClientId:', androidClientId);
-  console.log('Google auth request:', request);
-}, [request, webClientId, androidClientId]);
+    console.log('Google webClientId:', webClientId);
+    console.log('Google androidClientId:', androidClientId);
+    console.log('Google auth request:', request);
+  }, [request, webClientId, androidClientId]);
 
   useEffect(() => {
     const handleGoogleResponse = async () => {
       if (!response || response.type !== 'success') return;
 
       try {
-        const idToken = response.params?.id_token;
+        const code = response.params?.code;
+
+        if (!code) {
+          Alert.alert('Sign-in failed', 'Google did not return an authorization code.');
+          return;
+        }
+
+        if (!request?.redirectUri || !request?.codeVerifier) {
+          Alert.alert('Sign-in failed', 'Google request is missing redirect URI or code verifier.');
+          return;
+        }
+
+        if (!androidClientId) {
+          Alert.alert('Sign-in failed', 'Android Google Client ID is missing.');
+          return;
+        }
+
+        const tokenResult = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: androidClientId,
+            code,
+            redirectUri: request.redirectUri,
+            extraParams: {
+              code_verifier: request.codeVerifier,
+            },
+          },
+          {
+            tokenEndpoint: 'https://oauth2.googleapis.com/token',
+          }
+        );
+
+        const idToken =
+          tokenResult.idToken ||
+          (tokenResult as any).params?.id_token;
+
         if (!idToken) {
+          console.log('Google token result:', tokenResult);
           Alert.alert('Sign-in failed', 'Google did not return an ID token.');
           return;
         }
@@ -44,6 +74,7 @@ export default function Landing() {
         const result = await api.exchangeSession(idToken);
 
         console.log('Signed in user:', result.user);
+
         router.replace('/(tabs)/feed');
       } catch (error: any) {
         console.error('google sign-in exchange failed', error);
@@ -52,14 +83,18 @@ export default function Landing() {
     };
 
     handleGoogleResponse();
-  }, [response, router]);
+  }, [response, request, router, androidClientId]);
 
   const signIn = async () => {
     try {
       if (!webClientId || !androidClientId) {
-        Alert.alert('Google Sign-In not configured', 'Missing Google OAuth client IDs in .env.');
+        Alert.alert(
+          'Google Sign-In not configured',
+          'Missing Google OAuth client IDs in .env.'
+        );
         return;
       }
+
       await promptAsync();
     } catch (error: any) {
       console.error('google prompt failed', error);
@@ -72,7 +107,11 @@ export default function Landing() {
       <Text style={styles.title}>Household COO</Text>
       <Text style={styles.subtitle}>Your household chief of staff</Text>
 
-      <Pressable onPress={signIn} style={[styles.button, !request && styles.disabled]}>
+      <Pressable
+        onPress={signIn}
+        disabled={!request}
+        style={[styles.button, !request && styles.disabled]}
+      >
         <Text style={styles.buttonText}>Sign in with Google</Text>
       </Pressable>
 
