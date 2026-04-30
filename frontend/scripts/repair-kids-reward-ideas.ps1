@@ -65,6 +65,15 @@ $content = $content.Replace("testID={\\reward-idea-}", "testID={idea.title}")
 $content = [regex]::Replace($content, "testID=\{[^\r\n\}]*reward-idea[^\r\n\}]*\}", "testID={idea.title}")
 $content = [regex]::Replace($content, "testID=\{\\[^\r\n\}]*\}", "testID={idea.title}")
 
+# Last-resort parser repair: replace any malformed testID line inside the reward idea map.
+$lines = $content -split "`r?`n"
+for ($i = 0; $i -lt $lines.Length; $i++) {
+  if ($lines[$i] -match "testID=" -and ($lines[$i] -match "reward-idea" -or $lines[$i] -match "\\")) {
+    $lines[$i] = "                    testID={idea.title}"
+  }
+}
+$content = $lines -join "`r`n"
+
 # Fix literal escaped newline accidentally inserted in JSX.
 $content = $content.Replace("</View>\n              {rewards.length", "</View>`r`n              {rewards.length")
 
