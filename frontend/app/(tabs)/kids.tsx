@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -48,6 +48,13 @@ type RewardSheetMode = 'create' | 'edit';
 type StarMode = 'add' | 'remove';
 
 const DEFAULT_REWARD_ICON = 'ðŸŽ';
+
+const REWARD_IDEAS = [
+  { title: 'Pizza night', cost_stars: 50, icon: '\u{1F355}' },
+  { title: 'Movie night', cost_stars: 75, icon: '\u{1F3AC}' },
+  { title: 'Ice cream treat', cost_stars: 40, icon: '\u{1F366}' },
+  { title: 'Game time', cost_stars: 60, icon: '\u{1F3AE}' },
+] as const;
 
 const ICON_LIBRARY: { match: string[]; icons: string[] }[] = [
   { match: ['pizza', 'dinner', 'restaurant', 'food'], icons: ['ðŸ•', 'ðŸ½ï¸', 'ðŸŽ‰', 'ðŸ”'] },
@@ -559,6 +566,33 @@ export default function KidsScreen() {
                 <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Reward Shop</Text>
               </View>
 
+
+              <View style={styles.rewardIdeaGrid}>
+                {REWARD_IDEAS.map((idea) => (
+                  <PressScale
+                    key={idea.title}
+                    testID={eward-idea-}
+                    onPress={() => {
+                      setRewardMode('create');
+                      setEditingReward(null);
+                      setRewardTitle(idea.title);
+                      setRewardCost(String(idea.cost_stars));
+                      setRewardIcon(idea.icon);
+                      setShowRewardSheet(true);
+                    }}
+                    style={[styles.rewardIdeaCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
+                  >
+                    <Text style={styles.rewardIdeaIcon}>{idea.icon}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.rewardIdeaTitle, { color: theme.colors.text }]} numberOfLines={1}>{idea.title}</Text>
+                      <View style={styles.rewardIdeaCostRow}>
+                        <Star color={theme.colors.accent} size={11} fill={theme.colors.accent} />
+                        <Text style={[styles.rewardIdeaCost, { color: theme.colors.textMuted }]}>{idea.cost_stars} {t('stars')}</Text>
+                      </View>
+                    </View>
+                  </PressScale>
+                ))}
+              </View>
               {rewards.length === 0 ? (
                 <EmptyState title={t('no_rewards')} message="Create a small reward to make chores feel more motivating." actionLabel="Add Reward" onAction={openCreateReward} />
               ) : (
@@ -830,7 +864,12 @@ const styles = StyleSheet.create({
   activityDelta: { width: 48, fontFamily: 'Inter_800ExtraBold', fontSize: 17 },
   activityReason: { fontFamily: 'Inter_700Bold', fontSize: 14 },
   activityDate: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 2 },
-  rewardCard: { marginBottom: 12 },
+  rewardIdeaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
+  rewardIdeaCard: { flexGrow: 1, flexBasis: '47%', minHeight: 74, borderRadius: 22, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  rewardIdeaIcon: { fontSize: 26 },
+  rewardIdeaTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 14, lineHeight: 18 },
+  rewardIdeaCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  rewardIdeaCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },  rewardCard: { marginBottom: 12 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   rewardIcon: { fontSize: 30 },
   rewardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, lineHeight: 24 },
