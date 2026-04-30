@@ -30,6 +30,13 @@ $content = $content.Replace("</View>\n              {rewards.length", "</View>`r
 $content = $content.Replace("Reward good habits Â· keep it fair", "Reward good habits - keep it fair")
 $content = $content.Replace("âˆ’ Stars", "- Stars")
 
+# Remove unused helper that now triggers lint warnings.
+$content = [regex]::Replace(
+  $content,
+  "\r?\n\s*const applyIconSuggestion = \(icon: string\) => \{\r?\n\s*setRewardIcon\(icon\);\r?\n\s*\};\r?\n",
+  "`r`n"
+)
+
 $constants = @'
 const DEFAULT_REWARD_ICON = String.fromCodePoint(0x1F381);
 
@@ -141,6 +148,7 @@ $styleBlock = @'
   rewardIdeaCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   rewardIdeaCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
   rewardIdeaHint: { fontFamily: 'Inter_600SemiBold', fontSize: 11, lineHeight: 15, marginTop: 6 },
+  rewardCard: { marginBottom: 12 },
 '@
 
 # Remove old reward idea style lines if present.
@@ -155,11 +163,11 @@ $content = [regex]::Replace($content, "(?m)^\s*rewardIdeaTitle: .*\r?\n", "")
 $content = [regex]::Replace($content, "(?m)^\s*rewardIdeaCostRow: .*\r?\n", "")
 $content = [regex]::Replace($content, "(?m)^\s*rewardIdeaCost: .*\r?\n", "")
 $content = [regex]::Replace($content, "(?m)^\s*rewardIdeaHint: .*\r?\n", "")
+$content = [regex]::Replace($content, "(?m)^\s*rewardCard: .*\r?\n", "")
 
 # Insert styles before the regular reward styles. Fallback to the end of StyleSheet if formatting differs.
 $inserted = $false
 $markers = @(
-  "(?m)^\s*rewardCard:\s*\{",
   "(?m)^\s*rewardRow:\s*\{",
   "(?m)^\s*rewardIcon:\s*\{",
   "(?m)^\s*sheet:\s*\{"
