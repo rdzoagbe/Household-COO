@@ -556,86 +556,84 @@ export default function KidsScreen() {
                   })
                 )}
               </GlassCard>
+              <View style={[styles.rewardShopShell, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                <View style={styles.rewardShopHeaderCard}>
+                  <View style={[styles.rewardShopBadge, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.cardBorder }]}>
+                    <Gift color={theme.colors.accent} size={18} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.rewardShopTitle, { color: theme.colors.text }]}>Reward Shop</Text>
+                    <Text style={[styles.rewardShopSubtitle, { color: theme.colors.textMuted }]}>Beautiful little goals to keep good habits exciting.</Text>
+                  </View>
+                  <View style={[styles.rewardShopCountPill, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+                    <Star color={theme.colors.accent} size={12} fill={theme.colors.accent} />
+                    <Text style={[styles.rewardShopCountText, { color: theme.colors.text }]}>{affordableRewards}/{totalRewards}</Text>
+                  </View>
+                </View>
 
-              <View style={styles.sectionRow}>
-                <Gift color={theme.colors.textMuted} size={16} />
-                <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Reward Shop</Text>
-              </View>
-              <View style={styles.rewardIdeasHeader}>
-                <Text style={[styles.rewardIdeasTitle, { color: theme.colors.text }]}>Reward ideas</Text>
-                <Text style={[styles.rewardIdeasSub, { color: theme.colors.textMuted }]}>Tap a card to prefill a reward</Text>
-              </View>
-
-              <View style={styles.rewardIdeaGrid}>
-                {REWARD_IDEAS.map((idea) => (
-                  <PressScale
-                    key={idea.title}
-                    testID={idea.title}
-                    onPress={() => {
-                      setRewardMode('create');
-                      setEditingReward(null);
-                      setRewardTitle(idea.title);
-                      setRewardCost(String(idea.cost_stars));
-                      setRewardIcon(idea.icon);
-                      setShowRewardSheet(true);
-                    }}
-                    style={[
-                      styles.rewardIdeaCard,
-                      {
-                        backgroundColor: theme.colors.card,
-                        borderColor: theme.colors.cardBorder,
-                        shadowColor: theme.colors.shadow,
-                      },
-                    ]}
-                  >
-                    <View style={[styles.rewardIdeaIconWrap, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.cardBorder }]}>
-                      <Text style={styles.rewardIdeaIcon}>{idea.icon}</Text>
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.rewardIdeaTitle, { color: theme.colors.text }]} numberOfLines={1}>{idea.title}</Text>
-
-                      <View style={styles.rewardIdeaCostRow}>
-                        <Star color={theme.colors.accent} size={11} fill={theme.colors.accent} />
-                        <Text style={[styles.rewardIdeaCost, { color: theme.colors.textMuted }]}>{idea.cost_stars} {t('stars')}</Text>
+                <Text style={[styles.rewardIdeasSub, { color: theme.colors.textMuted }]}>Quick reward ideas</Text>
+                <View style={styles.rewardIdeaGrid}>
+                  {REWARD_IDEAS.map((idea) => (
+                    <PressScale key={idea.title} testID={idea.title} onPress={() => { setRewardMode('create'); setEditingReward(null); setRewardTitle(idea.title); setRewardCost(String(idea.cost_stars)); setRewardIcon(idea.icon); setShowRewardSheet(true); }} style={[styles.rewardIdeaCard, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
+                      <View style={[styles.rewardIdeaIconWrap, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.cardBorder }]}>
+                        <Text style={styles.rewardIdeaIcon}>{idea.icon}</Text>
                       </View>
-
-                      <Text style={[styles.rewardIdeaHint, { color: theme.colors.textMuted }]}>Tap to create</Text>
-                    </View>
-                  </PressScale>
-                ))}
-              </View>
-              {rewards.length === 0 ? (
-                <EmptyState title={t('no_rewards')} message="Create a small reward to make chores feel more motivating." actionLabel="Add Reward" onAction={openCreateReward} />
-              ) : (
-                rewards.map((reward) => {
-                  const affordable = stars >= reward.cost_stars;
-                  return (
-                    <GlassCard key={reward.reward_id} style={styles.rewardCard}>
-                      <View style={styles.rewardRow}>
-                        <Text style={styles.rewardIcon}>{reward.icon || DEFAULT_REWARD_ICON}</Text>
-                        <View style={{ flex: 1 }}>
-                          <Text style={[styles.rewardTitle, { color: theme.colors.text }]} numberOfLines={2}>{reward.title}</Text>
-                          <View style={styles.rewardCostRow}>
-                            <Star color={theme.colors.accent} size={12} fill={theme.colors.accent} />
-                            <Text style={[styles.rewardCost, { color: theme.colors.textMuted }]}>{reward.cost_stars} {t('stars')}</Text>
-                          </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.rewardIdeaTitle, { color: theme.colors.text }]} numberOfLines={1}>{idea.title}</Text>
+                        <View style={styles.rewardIdeaCostRow}>
+                          <Star color={theme.colors.accent} size={11} fill={theme.colors.accent} />
+                          <Text style={[styles.rewardIdeaCost, { color: theme.colors.textMuted }]}>{idea.cost_stars} {t('stars')}</Text>
                         </View>
+                        <Text style={[styles.rewardIdeaHint, { color: theme.colors.textMuted }]}>Tap to create</Text>
                       </View>
+                    </PressScale>
+                  ))}
+                </View>
 
-                      <View style={styles.rewardActions}>
-                        <PressScale testID={`redeem-${reward.reward_id}`} onPress={() => redeem(reward)} disabled={!affordable} style={[styles.redeemBtn, { backgroundColor: theme.colors.primary }, !affordable && { opacity: 0.4 }]}>
-                          <Text style={[styles.redeemText, { color: theme.colors.primaryText }]}>{affordable ? t('redeem') : `Need ${reward.cost_stars - stars}`}</Text>
-                        </PressScale>
-                        <PressScale testID={`edit-reward-${reward.reward_id}`} onPress={() => openEditReward(reward)} style={[styles.editBtn, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
-                          <Pencil color={theme.colors.textMuted} size={15} />
-                          <Text style={[styles.editText, { color: theme.colors.textMuted }]}>Edit</Text>
-                        </PressScale>
-                      </View>
-                    </GlassCard>
-                  );
-                })
-              )}
+                {rewards.length === 0 ? (
+                  <EmptyState title={t('no_rewards')} message="Create a small reward to make chores feel more motivating." actionLabel="Add Reward" onAction={openCreateReward} />
+                ) : (
+                  <View style={styles.rewardList}>
+                    {rewards.map((reward) => {
+                      const affordable = stars >= reward.cost_stars;
+                      const starsNeeded = Math.max(0, reward.cost_stars - stars);
+                      const progressWidth = `${Math.min(100, Math.round((stars / reward.cost_stars) * 100))}%`;
+
+                      return (
+                        <GlassCard key={reward.reward_id} style={[styles.rewardCard, { borderColor: affordable ? theme.colors.accent : theme.colors.cardBorder }]}>
+                          <View style={styles.rewardTopRow}>
+                            <View style={[styles.rewardIconWrap, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.cardBorder }]}>
+                              <Text style={styles.rewardIcon}>{reward.icon || DEFAULT_REWARD_ICON}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={[styles.rewardTitle, { color: theme.colors.text }]} numberOfLines={2}>{reward.title}</Text>
+                              <View style={styles.rewardMetaRow}>
+                                <View style={[styles.rewardCostPill, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+                                  <Star color={theme.colors.accent} size={12} fill={theme.colors.accent} />
+                                  <Text style={[styles.rewardCost, { color: theme.colors.textMuted }]}>{reward.cost_stars} {t('stars')}</Text>
+                                </View>
+                                <Text style={[styles.rewardAvailability, { color: affordable ? theme.colors.success : theme.colors.textMuted }]}>{affordable ? 'Ready to redeem' : `${starsNeeded} more needed`}</Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={[styles.rewardProgressTrack, { backgroundColor: theme.colors.bgSoft }]}>
+                            <View style={[styles.rewardProgressFill, { width: progressWidth as any, backgroundColor: theme.colors.accent }]} />
+                          </View>
+                          <View style={styles.rewardActions}>
+                            <PressScale testID={`redeem-${reward.reward_id}`} onPress={() => redeem(reward)} disabled={!affordable} style={[styles.redeemBtn, { backgroundColor: theme.colors.primary }, !affordable && { opacity: 0.45 }]}>
+                              <Text style={[styles.redeemText, { color: theme.colors.primaryText }]}>{affordable ? t('redeem') : 'Not enough stars'}</Text>
+                            </PressScale>
+                            <PressScale testID={`edit-reward-${reward.reward_id}`} onPress={() => openEditReward(reward)} style={[styles.editBtn, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+                              <Pencil color={theme.colors.textMuted} size={15} />
+                              <Text style={[styles.editText, { color: theme.colors.textMuted }]}>Edit</Text>
+                            </PressScale>
+                          </View>
+                        </GlassCard>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
 
               <View style={styles.tip}>
                 <Sparkles color={theme.colors.textMuted} size={14} />
@@ -721,7 +719,7 @@ export default function KidsScreen() {
         <Text style={[styles.label, { color: theme.colors.textMuted }]}>Suggested icon</Text>
         <View style={styles.iconSuggestionRow}>
           {iconSuggestions.map((icon) => (
-            <PressScale key={icon} testID={`reward-icon-${icon}`}>
+            <PressScale key={icon} testID={`reward-icon-${icon}`} onPress={() => setRewardIcon(icon)} style={[styles.iconChip, { backgroundColor: rewardIcon === icon ? theme.colors.accentSoft : theme.colors.bgSoft, borderColor: rewardIcon === icon ? theme.colors.accent : theme.colors.cardBorder }]}>
               <Text style={styles.iconChipText}>{icon}</Text>
             </PressScale>
           ))}
@@ -878,9 +876,14 @@ const styles = StyleSheet.create({
   activityDate: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 2 },
   tip: { flexDirection: 'row', alignItems: 'center', gap: 7, justifyContent: 'center', marginTop: 16 },
   tipText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  rewardIdeasHeader: { marginTop: 2, marginBottom: 12 },
-  rewardIdeasTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, lineHeight: 22 },
-  rewardIdeasSub: { fontFamily: 'Inter_500Medium', fontSize: 13, lineHeight: 18, marginTop: 4 },
+  rewardShopShell: { borderWidth: 1, borderRadius: 32, padding: 16, marginTop: 6, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.08, shadowRadius: 22, elevation: 4 },
+  rewardShopHeaderCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  rewardShopBadge: { width: 48, height: 48, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  rewardShopTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 22, lineHeight: 27, letterSpacing: -0.4 },
+  rewardShopSubtitle: { fontFamily: 'Inter_500Medium', fontSize: 13, lineHeight: 18, marginTop: 3 },
+  rewardShopCountPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 9999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 7 },
+  rewardShopCountText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
+  rewardIdeasSub: { fontFamily: 'Inter_700Bold', fontSize: 12, lineHeight: 16, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.9 },
   rewardIdeaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   rewardIdeaCard: { flexGrow: 1, flexBasis: '47%', minHeight: 92, borderRadius: 24, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 2 },
   rewardIdeaIconWrap: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
@@ -889,16 +892,22 @@ const styles = StyleSheet.create({
   rewardIdeaCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   rewardIdeaCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
   rewardIdeaHint: { fontFamily: 'Inter_600SemiBold', fontSize: 11, lineHeight: 15, marginTop: 6 },
-  rewardCard: { marginBottom: 12 },
-  rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rewardList: { gap: 12 },
+  rewardCard: { padding: 16, borderRadius: 28, borderWidth: 1 },
+  rewardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  rewardIconWrap: { width: 58, height: 58, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   rewardIcon: { fontSize: 30 },
-  rewardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 16, lineHeight: 20 },
-  rewardCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  rewardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, lineHeight: 23 },
+  rewardMetaRow: { marginTop: 8, gap: 7 },
+  rewardCostPill: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 6 },
   rewardCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
-  rewardActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  redeemBtn: { flex: 1, minHeight: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  rewardAvailability: { fontFamily: 'Inter_700Bold', fontSize: 12, lineHeight: 16 },
+  rewardProgressTrack: { height: 8, borderRadius: 9999, overflow: 'hidden', marginTop: 16 },
+  rewardProgressFill: { height: 8, borderRadius: 9999 },
+  rewardActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 15 },
+  redeemBtn: { flex: 1, minHeight: 46, borderRadius: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   redeemText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
-  editBtn: { minHeight: 44, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  editBtn: { minHeight: 46, borderRadius: 18, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   editText: { fontFamily: 'Inter_800ExtraBold', fontSize: 13 },  sheet: { borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 1, padding: 26, paddingBottom: 140 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sheetTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 24, lineHeight: 30, letterSpacing: -0.4, flexShrink: 1 },
