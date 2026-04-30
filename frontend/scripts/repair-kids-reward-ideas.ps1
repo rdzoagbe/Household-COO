@@ -59,8 +59,14 @@ $content = [regex]::Replace(
   "return matches?.icons || [DEFAULT_REWARD_ICON, String.fromCodePoint(0x2B50), String.fromCodePoint(0x1F389), String.fromCodePoint(0x1F3C6), String.fromCodePoint(0x2728), String.fromCodePoint(0x1F355), String.fromCodePoint(0x1F3AC), String.fromCodePoint(0x1F3AE)];"
 )
 
-# Fix the bad JSX line inserted by the previous script.
+# Fix every known bad JSX variant inserted by the first patch script.
 $content = $content.Replace("testID={\reward-idea-}", "testID={idea.title}")
+$content = $content.Replace("testID={\\reward-idea-}", "testID={idea.title}")
+$content = [regex]::Replace($content, "testID=\{[^\r\n\}]*reward-idea[^\r\n\}]*\}", "testID={idea.title}")
+$content = [regex]::Replace($content, "testID=\{\\[^\r\n\}]*\}", "testID={idea.title}")
+
+# Fix literal escaped newline accidentally inserted in JSX.
+$content = $content.Replace("</View>\n              {rewards.length", "</View>`r`n              {rewards.length")
 
 # Repair mojibake text created by the previous PowerShell write.
 $content = $content.Replace("Reward good habits Â· keep it fair", "Reward good habits - keep it fair")
