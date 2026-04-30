@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, ImageBackground, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,19 @@ WebBrowser.maybeCompleteAuthSession();
 
 const BG_URL =
   'https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-4e7f-a0c1-6a43a75126d3/images/6b243a1cf4a6ac9e40857ce24db4ef57d5831d303169f63507bb73111fe11fac.png';
+
+const FALLBACK_GOOGLE_WEB_CLIENT_ID =
+  '243255248169-cei972lc7kmfig6tmjb6l2nlmgqkjf22.apps.googleusercontent.com';
+const FALLBACK_GOOGLE_ANDROID_CLIENT_ID =
+  '243255248169-ike4t51ha6o8c5rcgsp7mvke2g5t67o1.apps.googleusercontent.com';
+
+function validGoogleClientId(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (trimmed.includes('PASTE_') || trimmed.includes('YOUR_REAL_')) return undefined;
+  if (!trimmed.endsWith('.apps.googleusercontent.com')) return undefined;
+  return trimmed;
+}
 
 function extractInviteToken(rawUrl?: string | null) {
   if (!rawUrl) return null;
@@ -44,6 +57,21 @@ function isExpoGoAndroid() {
   return Platform.OS === 'android' && Constants.appOwnership === 'expo';
 }
 
+function getGoogleIdTokenFromNativeResult(result: any) {
+  return result?.data?.idToken || result?.idToken || result?.user?.idToken || null;
+}
+
+function describeGoogleSignInError(error: any) {
+  const code = error?.code ? String(error.code) : '';
+  const message = error?.message ? String(error.message) : '';
+
+  if (code === 'DEVELOPER_ERROR' || message.includes('DEVELOPER_ERROR')) {
+    return 'Google Sign-In returned DEVELOPER_ERROR. The app is using the configured Web client ID and Android package/SHA-1. If this continues, wait a few minutes for Google Cloud changes to propagate, then rebuild the Android dev client.';
+  }
+
+  return code || message || 'Please try again.';
+}
+
 export default function Landing() {
   const router = useRouter();
   const handledResponseRef = useRef(false);
@@ -53,13 +81,45 @@ export default function Landing() {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [invitedBy, setInvitedBy] = useState<string | null>(null);
 
-  const webClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
-  const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
+  const webClientId =
+    validGoogleClientId(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) || FALLBACK_GOOGLE_WEB_CLIENT_ID;
+  const androidClientId =
+    validGoogleClientId(process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID) || FALLBACK_GOOGLE_ANDROID_CLIENT_ID;
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
     androidClientId,
     webClientId,
   });
+
+  const canStartSignIn = Platform.OS === 'android' ? Boolean(webClientId) : Boolean(request && webClientId);
+
+  const completeSignInWithIdToken = useCallback(
+    async (idToken: string) => {
+      let token = inviteToken || undefined;
+      if (!token && Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          token = window.sessionStorage.getItem('pending_invite') || undefined;
+        } catch {
+          // Ignore storage failure.
+        }
+      }
+
+      const { api } = await import('../src/api');
+      const authResult = await api.exchangeSession(idToken, token);
+      await setUserFromAuth(authResult.user, authResult.session_token);
+
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        try {
+          window.sessionStorage.removeItem('pending_invite');
+        } catch {
+          // Ignore storage failure.
+        }
+      }
+
+      router.replace('/feed');
+    },
+    [inviteToken, router, setUserFromAuth]
+  );
 
   useEffect(() => {
     if (!loading && user) {
@@ -127,28 +187,7 @@ export default function Landing() {
           return;
         }
 
-        let token = inviteToken || undefined;
-        if (!token && Platform.OS === 'web' && typeof window !== 'undefined') {
-          try {
-            token = window.sessionStorage.getItem('pending_invite') || undefined;
-          } catch {
-            // Ignore storage failure.
-          }
-        }
-
-        const { api } = await import('../src/api');
-        const authResult = await api.exchangeSession(idToken, token);
-        await setUserFromAuth(authResult.user, authResult.session_token);
-
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          try {
-            window.sessionStorage.removeItem('pending_invite');
-          } catch {
-            // Ignore storage failure.
-          }
-        }
-
-        router.replace('/feed');
+        await completeSignInWithIdToken(idToken);
       } catch (error: any) {
         logger.error('google sign-in failed', error?.message || error);
         Alert.alert('Sign-in failed', error?.message || 'Please try again.');
@@ -157,20 +196,57 @@ export default function Landing() {
     };
 
     handleGoogleResponse();
-  }, [response, inviteToken, router, setUserFromAuth]);
+  }, [response, completeSignInWithIdToken]);
 
-  const signIn = async () => {
+  const signInWithNativeGoogle = async () => {
     try {
-      if (isExpoGoAndroid()) {
-        Alert.alert(
-          'Development build required',
-          'Google sign-in cannot be tested in Expo Go on Android because the OAuth redirect belongs to Expo Go, not Household COO. Use a Household COO development build to test sign-in.'
-        );
+      const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
+
+      GoogleSignin.configure({
+        webClientId,
+        offlineAccess: false,
+      });
+
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+      const result = await GoogleSignin.signIn();
+      let idToken = getGoogleIdTokenFromNativeResult(result);
+
+      if (!idToken) {
+        const tokens = await GoogleSignin.getTokens();
+        idToken = tokens.idToken;
+      }
+
+      if (!idToken) {
+        Alert.alert('Sign-in failed', 'Google did not return an ID token.');
         return;
       }
 
-      if (!webClientId || !androidClientId) {
-        Alert.alert('Google Sign-In not configured', 'Missing Google OAuth client IDs in .env.');
+      await completeSignInWithIdToken(idToken);
+    } catch (error: any) {
+      const details = describeGoogleSignInError(error);
+      logger.error('native google sign-in failed', error?.code || error?.message || error);
+      Alert.alert('Google Sign-In failed', details);
+    }
+  };
+
+  const signIn = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        if (isExpoGoAndroid()) {
+          Alert.alert(
+            'Development build required',
+            'Google sign-in cannot be tested in Expo Go on Android because the OAuth redirect belongs to Expo Go, not Household COO. Use a Household COO development build to test sign-in.'
+          );
+          return;
+        }
+
+        await signInWithNativeGoogle();
+        return;
+      }
+
+      if (!webClientId) {
+        Alert.alert('Google Sign-In not configured', 'Missing Google OAuth web client ID.');
         return;
       }
 
@@ -243,11 +319,11 @@ export default function Landing() {
             <PressScale
               testID="google-signin"
               onPress={signIn}
-              disabled={!request}
+              disabled={!canStartSignIn}
               style={[
                 styles.cta,
                 { backgroundColor: theme.colors.primary },
-                !request && styles.ctaDisabled,
+                !canStartSignIn && styles.ctaDisabled,
               ]}
             >
               <View style={styles.googleDot}>
