@@ -37,8 +37,8 @@ interface StoreState {
 
 const StoreContext = createContext<StoreState | null>(null);
 
-// v3 resets the older reference-light default so the premium dark UI appears immediately.
-const APPEARANCE_STORAGE_KEY = 'coo_appearance_mode_premium_dark_v3';
+// v4 forces a fresh premium-dark default for existing local installs that cached light mode during testing.
+const APPEARANCE_STORAGE_KEY = 'coo_appearance_mode_premium_dark_v4';
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useColorScheme();
