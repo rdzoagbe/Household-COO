@@ -92,7 +92,7 @@ $rewardShop = @'
                             </View>
                           </View>
                           <View style={[styles.rewardProgressTrack, { backgroundColor: theme.colors.bgSoft }]}>
-                            <View style={[styles.rewardProgressFill, { width: progressWidth, backgroundColor: theme.colors.accent }]} />
+                            <View style={[styles.rewardProgressFill, { width: progressWidth as any, backgroundColor: theme.colors.accent }]} />
                           </View>
                           <View style={styles.rewardActions}>
                             <PressScale testID={`redeem-${reward.reward_id}`} onPress={() => redeem(reward)} disabled={!affordable} style={[styles.redeemBtn, { backgroundColor: theme.colors.primary }, !affordable && { opacity: 0.45 }]}>
