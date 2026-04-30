@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Alert, ImageBackground, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -18,8 +18,6 @@ WebBrowser.maybeCompleteAuthSession();
 
 const BG_URL =
   'https://static.prod-images.emergentagent.com/jobs/096ff1e5-0337-4e7f-a0c1-6a43a75126d3/images/6b243a1cf4a6ac9e40857ce24db4ef57d5831d303169f63507bb73111fe11fac.png';
-
-const PLACEHOLDER_GOOGLE_CLIENT_ID = 'missing-client-id.apps.googleusercontent.com';
 
 function extractInviteToken(rawUrl?: string | null) {
   if (!rawUrl) return null;
@@ -46,15 +44,6 @@ function isExpoGoAndroid() {
   return Platform.OS === 'android' && Constants.appOwnership === 'expo';
 }
 
-function getGoogleIdTokenFromNativeResult(result: any) {
-  return (
-    result?.data?.idToken ||
-    result?.idToken ||
-    result?.user?.idToken ||
-    null
-  );
-}
-
 export default function Landing() {
   const router = useRouter();
   const handledResponseRef = useRef(false);
@@ -68,36 +57,9 @@ export default function Landing() {
   const androidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    androidClientId: androidClientId || webClientId || PLACEHOLDER_GOOGLE_CLIENT_ID,
-    webClientId: webClientId || androidClientId || PLACEHOLDER_GOOGLE_CLIENT_ID,
+    androidClientId,
+    webClientId,
   });
-
-  const canStartSignIn = Platform.OS === 'android' ? Boolean(webClientId) : Boolean(request && webClientId);
-
-  const completeSignInWithIdToken = useCallback(async (idToken: string) => {
-    let token = inviteToken || undefined;
-    if (!token && Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        token = window.sessionStorage.getItem('pending_invite') || undefined;
-      } catch {
-        // Ignore storage failure.
-      }
-    }
-
-    const { api } = await import('../src/api');
-    const authResult = await api.exchangeSession(idToken, token);
-    await setUserFromAuth(authResult.user, authResult.session_token);
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        window.sessionStorage.removeItem('pending_invite');
-      } catch {
-        // Ignore storage failure.
-      }
-    }
-
-    router.replace('/feed');
-  }, [inviteToken, router, setUserFromAuth]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -165,7 +127,28 @@ export default function Landing() {
           return;
         }
 
-        await completeSignInWithIdToken(idToken);
+        let token = inviteToken || undefined;
+        if (!token && Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            token = window.sessionStorage.getItem('pending_invite') || undefined;
+          } catch {
+            // Ignore storage failure.
+          }
+        }
+
+        const { api } = await import('../src/api');
+        const authResult = await api.exchangeSession(idToken, token);
+        await setUserFromAuth(authResult.user, authResult.session_token);
+
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.removeItem('pending_invite');
+          } catch {
+            // Ignore storage failure.
+          }
+        }
+
+        router.replace('/feed');
       } catch (error: any) {
         logger.error('google sign-in failed', error?.message || error);
         Alert.alert('Sign-in failed', error?.message || 'Please try again.');
@@ -174,61 +157,20 @@ export default function Landing() {
     };
 
     handleGoogleResponse();
-  }, [response, completeSignInWithIdToken]);
-
-  const signInWithNativeGoogle = async () => {
-    if (!webClientId) {
-      Alert.alert('Google Sign-In not configured', 'Missing EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID in .env.');
-      return;
-    }
-
-    try {
-      const { GoogleSignin } = await import('@react-native-google-signin/google-signin');
-
-      GoogleSignin.configure({
-        webClientId,
-        offlineAccess: false,
-      });
-
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-
-      const result = await GoogleSignin.signIn();
-      let idToken = getGoogleIdTokenFromNativeResult(result);
-
-      if (!idToken) {
-        const tokens = await GoogleSignin.getTokens();
-        idToken = tokens.idToken;
-      }
-
-      if (!idToken) {
-        Alert.alert('Sign-in failed', 'Google did not return an ID token.');
-        return;
-      }
-
-      await completeSignInWithIdToken(idToken);
-    } catch (error: any) {
-      logger.error('native google sign-in failed', error?.message || error);
-      Alert.alert('Sign-in failed', error?.message || 'Please check your Google OAuth configuration and try again.');
-    }
-  };
+  }, [response, inviteToken, router, setUserFromAuth]);
 
   const signIn = async () => {
     try {
-      if (Platform.OS === 'android') {
-        if (isExpoGoAndroid()) {
-          Alert.alert(
-            'Development build required',
-            'Google sign-in cannot be tested in Expo Go on Android because the OAuth redirect belongs to Expo Go, not Household COO. Use a Household COO development build to test sign-in.'
-          );
-          return;
-        }
-
-        await signInWithNativeGoogle();
+      if (isExpoGoAndroid()) {
+        Alert.alert(
+          'Development build required',
+          'Google sign-in cannot be tested in Expo Go on Android because the OAuth redirect belongs to Expo Go, not Household COO. Use a Household COO development build to test sign-in.'
+        );
         return;
       }
 
-      if (!webClientId) {
-        Alert.alert('Google Sign-In not configured', 'Missing Google OAuth web client ID in .env.');
+      if (!webClientId || !androidClientId) {
+        Alert.alert('Google Sign-In not configured', 'Missing Google OAuth client IDs in .env.');
         return;
       }
 
@@ -293,7 +235,7 @@ export default function Landing() {
           ) : null}
 
           <Text style={[styles.heading, { color: theme.colors.text }]}>{t('tagline')}</Text>
-          <Text style={[styles.sub, { color: theme.colors.textMuted }]}> 
+          <Text style={[styles.sub, { color: theme.colors.textMuted }]}>
             A calmer household dashboard with priorities, reminders, secure vaulting, and elegant coordination.
           </Text>
 
@@ -301,11 +243,11 @@ export default function Landing() {
             <PressScale
               testID="google-signin"
               onPress={signIn}
-              disabled={!canStartSignIn}
+              disabled={!request}
               style={[
                 styles.cta,
                 { backgroundColor: theme.colors.primary },
-                !canStartSignIn && styles.ctaDisabled,
+                !request && styles.ctaDisabled,
               ]}
             >
               <View style={styles.googleDot}>
