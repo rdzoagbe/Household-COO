@@ -149,28 +149,36 @@ $styleBlock = @'
   rewardIdeaCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
   rewardIdeaHint: { fontFamily: 'Inter_600SemiBold', fontSize: 11, lineHeight: 15, marginTop: 6 },
   rewardCard: { marginBottom: 12 },
+  rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rewardIcon: { fontSize: 30 },
+  rewardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 16, lineHeight: 20 },
+  rewardCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  rewardCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
+  rewardActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  redeemBtn: { flex: 1, minHeight: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  redeemText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+  editBtn: { minHeight: 44, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  editText: { fontFamily: 'Inter_800ExtraBold', fontSize: 13 },
 '@
 
-# Remove old reward idea style lines if present.
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeasHeader: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeasTitle: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeasSub: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaGrid: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaCard: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaIconWrap: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaIcon: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaTitle: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaCostRow: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaCost: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardIdeaHint: .*\r?\n", "")
-$content = [regex]::Replace($content, "(?m)^\s*rewardCard: .*\r?\n", "")
+# Remove old reward style lines if present.
+$styleNames = @(
+  'rewardIdeasHeader', 'rewardIdeasTitle', 'rewardIdeasSub', 'rewardIdeaGrid', 'rewardIdeaCard',
+  'rewardIdeaIconWrap', 'rewardIdeaIcon', 'rewardIdeaTitle', 'rewardIdeaCostRow', 'rewardIdeaCost',
+  'rewardIdeaHint', 'rewardCard', 'rewardRow', 'rewardIcon', 'rewardTitle', 'rewardCostRow',
+  'rewardCost', 'rewardActions', 'redeemBtn', 'redeemText', 'editBtn', 'editText'
+)
 
-# Insert styles before the regular reward styles. Fallback to the end of StyleSheet if formatting differs.
+foreach ($styleName in $styleNames) {
+  $content = [regex]::Replace($content, "(?m)^\s*$styleName\s*:\s*.*\r?\n", "")
+}
+
+# Insert styles before the sheet styles. This is stable even when reward styles were already deleted locally.
 $inserted = $false
 $markers = @(
-  "(?m)^\s*rewardRow:\s*\{",
-  "(?m)^\s*rewardIcon:\s*\{",
-  "(?m)^\s*sheet:\s*\{"
+  "(?m)^\s*sheet:\s*\{",
+  "(?m)^\s*sheetHeader:\s*\{",
+  "(?m)^\s*menuSheetButton:\s*\{"
 )
 
 foreach ($marker in $markers) {
