@@ -20,26 +20,56 @@ if (!(Test-Path $FeedFile)) {
 }
 
 $content = [System.IO.File]::ReadAllText($FeedFile, [System.Text.Encoding]::UTF8)
+$newLine = if ($content.Contains("`r`n")) { "`r`n" } else { "`n" }
 
 # Remove the duplicate floating action bar import and usage. Quick Actions already provides these actions.
-$content = $content.Replace("import { FloatingActionBar } from '../../src/components/FloatingActionBar';`r`n", "")
-$content = $content.Replace("import { FloatingActionBar } from '../../src/components/FloatingActionBar';`n", "")
+$content = [regex]::Replace($content, "(?m)^\s*import \{ FloatingActionBar \} from '../../src/components/FloatingActionBar';\s*\r?\n", "")
 $content = [regex]::Replace(
   $content,
   "\r?\n\s*<FloatingActionBar\s*\r?\n\s*onManual=\{openManual\}\s*\r?\n\s*onCamera=\{\(\) => setShowCamera\(true\)\}\s*\r?\n\s*onVoice=\{\(\) => setShowVoice\(true\)\}\s*\r?\n\s*/>\r?\n",
-  "`r`n"
+  $newLine
 )
+
+# Needs Attention will use a delete button.
+if ($content -notmatch "\bTrash2\b") {
+  $content = [regex]::Replace($content, "(?m)^(\s*FileText,\s*)$", '$1' + $newLine + '  Trash2,', 1)
+}
 
 # Use a smaller bottom spacer now that the floating buttons are gone.
 $content = $content.Replace("<View style={{ height: 220 }} />", "<View style={{ height: 120 }} />")
 
-# Replace the non-actionable Needs Attention preview with actionable compact cards.
-$oldBlockPattern = "(?s)dashboard\.priority\.slice\(0, 3\)\.map\(\(card\) => \(\s*<PressScale key=\{`priority-\$\{card\.card_id\}`\} style=\{\[styles\.priorityCard,[\s\S]*?</PressScale>\s*\)\)"
-$newBlock = @'
-dashboard.priority.slice(0, 4).map((card) => (
+# Replace the whole Needs Attention body between its section title and the next section.
+$sectionIndex = $content.IndexOf("{labels.needsAttention}")
+if ($sectionIndex -lt 0) {
+  throw "Could not find the Needs Attention section title."
+}
+
+$startMarker = "          {loading ? ("
+$start = $content.IndexOf($startMarker, $sectionIndex)
+if ($start -lt 0) {
+  throw "Could not find the Needs Attention loading block."
+}
+
+$nextSectionMarker = "          <View style={styles.section}>"
+$end = $content.IndexOf($nextSectionMarker, $start + $startMarker.Length)
+if ($end -lt 0) {
+  throw "Could not find the section after Needs Attention."
+}
+
+$replacement = @'
+          {loading ? (
+            <ActivityIndicator color={theme.colors.text} style={{ marginTop: 40 }} />
+          ) : dashboard.priority.length === 0 ? (
+            <GlassCard style={styles.emptyPriority}>
+              <CheckCircle2 color={theme.colors.success} size={28} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{labels.nothingUrgent}</Text>
+              <Text style={[styles.emptySub, { color: theme.colors.textMuted }]}>{labels.nothingUrgentSub}</Text>
+            </GlassCard>
+          ) : (
+            dashboard.priority.slice(0, 4).map((card) => (
               <GlassCard key={`priority-${card.card_id}`} style={styles.attentionCard}>
                 <View style={styles.attentionTopRow}>
-                  <View style={[styles.priorityIcon, { backgroundColor: card.type === 'TASK' ? theme.colors.bgSoft : theme.colors.accentSoft }]}> 
+                  <View style={[styles.priorityIcon, { backgroundColor: card.type === 'TASK' ? theme.colors.bgSoft : theme.colors.accentSoft }]}>
                     {card.type === 'TASK' ? <CheckCircle2 color={theme.colors.success} size={18} /> : <FileText color={theme.colors.accent} size={18} />}
                   </View>
                   <View style={{ flex: 1 }}>
@@ -59,12 +89,11 @@ dashboard.priority.slice(0, 4).map((card) => (
                 </View>
               </GlassCard>
             ))
+          )}
+
 '@
 
-if (-not [regex]::IsMatch($content, $oldBlockPattern)) {
-  throw "Could not find the Needs Attention priority block."
-}
-$content = [regex]::Replace($content, $oldBlockPattern, $newBlock, 1)
+$content = $content.Substring(0, $start) + $replacement.Replace("`n", $newLine) + $content.Substring($end)
 
 # Insert compact actionable styles.
 $styleNames = @('attentionCard', 'attentionTopRow', 'attentionActions', 'attentionDoneBtn', 'attentionDoneText', 'attentionDeleteBtn')
@@ -84,7 +113,7 @@ $styles = @'
 if (-not [regex]::IsMatch($content, "(?m)^\s*priorityCard:\s*\{")) {
   throw "Could not find priorityCard style insertion point."
 }
-$content = [regex]::Replace($content, "(?m)^\s*priorityCard:\s*\{", $styles + '$&', 1)
+$content = [regex]::Replace($content, "(?m)^\s*priorityCard:\s*\{", $styles.Replace("`n", $newLine) + '$&', 1)
 
 [System.IO.File]::WriteAllText($FeedFile, $content, $Utf8NoBom)
 
@@ -99,6 +128,13 @@ if ($LASTEXITCODE -ne 0) {
 Set-Location $RepoPath
 
 git add "frontend/app/(tabs)/feed.tsx"
+
+git diff --cached --quiet
+if ($LASTEXITCODE -eq 0) {
+  Write-Host "No feed.tsx changes to commit." -ForegroundColor Yellow
+  exit 0
+}
+
 git commit -m "Make feed attention cards actionable"
 git push origin $BranchName
 
