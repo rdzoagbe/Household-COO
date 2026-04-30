@@ -387,10 +387,6 @@ export default function KidsScreen() {
     await doRedeem(reward);
   };
 
-  const applyIconSuggestion = (icon: string) => {
-    setRewardIcon(icon);
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
       <AmbientBackground />
@@ -565,7 +561,10 @@ export default function KidsScreen() {
                 <Gift color={theme.colors.textMuted} size={16} />
                 <Text style={[styles.sectionLabel, { color: theme.colors.textMuted }]}>Reward Shop</Text>
               </View>
-
+              <View style={styles.rewardIdeasHeader}>
+                <Text style={[styles.rewardIdeasTitle, { color: theme.colors.text }]}>Reward ideas</Text>
+                <Text style={[styles.rewardIdeasSub, { color: theme.colors.textMuted }]}>Tap a card to prefill a reward</Text>
+              </View>
 
               <View style={styles.rewardIdeaGrid}>
                 {REWARD_IDEAS.map((idea) => (
@@ -580,15 +579,28 @@ export default function KidsScreen() {
                       setRewardIcon(idea.icon);
                       setShowRewardSheet(true);
                     }}
-                    style={[styles.rewardIdeaCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}
+                    style={[
+                      styles.rewardIdeaCard,
+                      {
+                        backgroundColor: theme.colors.card,
+                        borderColor: theme.colors.cardBorder,
+                        shadowColor: theme.colors.shadow,
+                      },
+                    ]}
                   >
-                    <Text style={styles.rewardIdeaIcon}>{idea.icon}</Text>
+                    <View style={[styles.rewardIdeaIconWrap, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.cardBorder }]}>
+                      <Text style={styles.rewardIdeaIcon}>{idea.icon}</Text>
+                    </View>
+
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.rewardIdeaTitle, { color: theme.colors.text }]} numberOfLines={1}>{idea.title}</Text>
+
                       <View style={styles.rewardIdeaCostRow}>
                         <Star color={theme.colors.accent} size={11} fill={theme.colors.accent} />
                         <Text style={[styles.rewardIdeaCost, { color: theme.colors.textMuted }]}>{idea.cost_stars} {t('stars')}</Text>
                       </View>
+
+                      <Text style={[styles.rewardIdeaHint, { color: theme.colors.textMuted }]}>Tap to create</Text>
                     </View>
                   </PressScale>
                 ))}
@@ -632,7 +644,7 @@ export default function KidsScreen() {
             </>
           )}
 
-          <View style={{ height: 190 }} />
+          <View style={{ height: 170 }} />
         </ScrollView>
       </SafeAreaView>
 
@@ -864,25 +876,30 @@ const styles = StyleSheet.create({
   activityDelta: { width: 48, fontFamily: 'Inter_800ExtraBold', fontSize: 17 },
   activityReason: { fontFamily: 'Inter_700Bold', fontSize: 14 },
   activityDate: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 2 },
-  rewardIdeaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
-  rewardIdeaCard: { flexGrow: 1, flexBasis: '47%', minHeight: 74, borderRadius: 22, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rewardIdeaIcon: { fontSize: 26 },
-  rewardIdeaTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 14, lineHeight: 18 },
-  rewardIdeaCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  rewardIdeaCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },  rewardCard: { marginBottom: 12 },
-  rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  rewardIcon: { fontSize: 30 },
-  rewardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, lineHeight: 24 },
-  rewardCostRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 },
-  rewardCost: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  rewardActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
-  redeemBtn: { flexGrow: 1, flexBasis: '55%', minHeight: 48, paddingHorizontal: 15, paddingVertical: 13, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
-  redeemText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
-  editBtn: { flexGrow: 1, minHeight: 48, paddingHorizontal: 15, paddingVertical: 13, borderRadius: 9999, borderWidth: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center' },
-  editText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
   tip: { flexDirection: 'row', alignItems: 'center', gap: 7, justifyContent: 'center', marginTop: 16 },
   tipText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  sheet: { borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 1, padding: 26, paddingBottom: 140 },
+  rewardIdeasHeader: { marginTop: 2, marginBottom: 12 },
+  rewardIdeasTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 18, lineHeight: 22 },
+  rewardIdeasSub: { fontFamily: 'Inter_500Medium', fontSize: 13, lineHeight: 18, marginTop: 4 },
+  rewardIdeaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  rewardIdeaCard: { flexGrow: 1, flexBasis: '47%', minHeight: 92, borderRadius: 24, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 10, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 2 },
+  rewardIdeaIconWrap: { width: 52, height: 52, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  rewardIdeaIcon: { fontSize: 28 },
+  rewardIdeaTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 14, lineHeight: 18 },
+  rewardIdeaCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  rewardIdeaCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
+  rewardIdeaHint: { fontFamily: 'Inter_600SemiBold', fontSize: 11, lineHeight: 15, marginTop: 6 },
+  rewardCard: { marginBottom: 12 },
+  rewardRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rewardIcon: { fontSize: 30 },
+  rewardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 16, lineHeight: 20 },
+  rewardCostRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  rewardCost: { fontFamily: 'Inter_700Bold', fontSize: 12 },
+  rewardActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  redeemBtn: { flex: 1, minHeight: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  redeemText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+  editBtn: { minHeight: 44, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  editText: { fontFamily: 'Inter_800ExtraBold', fontSize: 13 },  sheet: { borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 1, padding: 26, paddingBottom: 140 },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   sheetTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 24, lineHeight: 30, letterSpacing: -0.4, flexShrink: 1 },
   sheetHelp: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginTop: -2, marginBottom: 8 },
