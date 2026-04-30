@@ -47,30 +47,30 @@ type ToastState = {
 type RewardSheetMode = 'create' | 'edit';
 type StarMode = 'add' | 'remove';
 
-const DEFAULT_REWARD_ICON = 'ðŸŽ';
+const DEFAULT_REWARD_ICON = String.fromCodePoint(0x1F381);
 
 const REWARD_IDEAS = [
-  { title: 'Pizza night', cost_stars: 50, icon: '\u{1F355}' },
-  { title: 'Movie night', cost_stars: 75, icon: '\u{1F3AC}' },
-  { title: 'Ice cream treat', cost_stars: 40, icon: '\u{1F366}' },
-  { title: 'Game time', cost_stars: 60, icon: '\u{1F3AE}' },
+  { title: 'Pizza night', cost_stars: 50, icon: String.fromCodePoint(0x1F355) },
+  { title: 'Movie night', cost_stars: 75, icon: String.fromCodePoint(0x1F3AC) },
+  { title: 'Ice cream treat', cost_stars: 40, icon: String.fromCodePoint(0x1F366) },
+  { title: 'Game time', cost_stars: 60, icon: String.fromCodePoint(0x1F3AE) },
 ] as const;
 
 const ICON_LIBRARY: { match: string[]; icons: string[] }[] = [
-  { match: ['pizza', 'dinner', 'restaurant', 'food'], icons: ['ðŸ•', 'ðŸ½ï¸', 'ðŸŽ‰', 'ðŸ”'] },
-  { match: ['movie', 'cinema', 'film'], icons: ['ðŸŽ¬', 'ðŸ¿', 'ðŸŽŸï¸', 'â­'] },
-  { match: ['ice', 'cream', 'sweet', 'cake', 'cupcake', 'dessert'], icons: ['ðŸ¦', 'ðŸ§', 'ðŸ°', 'ðŸ©'] },
-  { match: ['game', 'gaming', 'playstation', 'xbox', 'switch'], icons: ['ðŸŽ®', 'ðŸ•¹ï¸', 'ðŸ†', 'âš¡'] },
-  { match: ['park', 'outside', 'walk', 'trip'], icons: ['ðŸŒ³', 'ðŸ›', 'â˜€ï¸', 'ðŸš²'] },
-  { match: ['book', 'reading', 'story'], icons: ['ðŸ“š', 'ðŸ“–', 'âœ¨', 'ðŸ…'] },
-  { match: ['toy', 'lego', 'gift'], icons: ['ðŸ§¸', 'ðŸŽ', 'ðŸª€', 'âœ¨'] },
-  { match: ['sleepover', 'friend', 'party'], icons: ['ðŸŽ‰', 'ðŸ ', 'ðŸ§ƒ', 'â­'] },
+  { match: ['pizza', 'dinner', 'restaurant', 'food'], icons: [String.fromCodePoint(0x1F355), String.fromCodePoint(0x1F37D), String.fromCodePoint(0x1F389), String.fromCodePoint(0x1F354)] },
+  { match: ['movie', 'cinema', 'film'], icons: [String.fromCodePoint(0x1F3AC), String.fromCodePoint(0x1F37F), String.fromCodePoint(0x1F39F), String.fromCodePoint(0x2B50)] },
+  { match: ['ice', 'cream', 'sweet', 'cake', 'cupcake', 'dessert'], icons: [String.fromCodePoint(0x1F366), String.fromCodePoint(0x1F9C1), String.fromCodePoint(0x1F370), String.fromCodePoint(0x1F369)] },
+  { match: ['game', 'gaming', 'playstation', 'xbox', 'switch'], icons: [String.fromCodePoint(0x1F3AE), String.fromCodePoint(0x1F579), String.fromCodePoint(0x1F3C6), String.fromCodePoint(0x26A1)] },
+  { match: ['park', 'outside', 'walk', 'trip'], icons: [String.fromCodePoint(0x1F333), String.fromCodePoint(0x1F6DD), String.fromCodePoint(0x2600), String.fromCodePoint(0x1F6B2)] },
+  { match: ['book', 'reading', 'story'], icons: [String.fromCodePoint(0x1F4DA), String.fromCodePoint(0x1F4D6), String.fromCodePoint(0x2728), String.fromCodePoint(0x1F3C5)] },
+  { match: ['toy', 'lego', 'gift'], icons: [String.fromCodePoint(0x1F9F8), String.fromCodePoint(0x1F381), String.fromCodePoint(0x1FA80), String.fromCodePoint(0x2728)] },
+  { match: ['sleepover', 'friend', 'party'], icons: [String.fromCodePoint(0x1F389), String.fromCodePoint(0x1F3E0), String.fromCodePoint(0x1F9C3), String.fromCodePoint(0x2B50)] },
 ];
 
 function suggestedIcons(title: string) {
   const normalized = title.trim().toLowerCase();
   const matches = ICON_LIBRARY.find((group) => group.match.some((word) => normalized.includes(word)));
-  return matches?.icons || ['ðŸŽ', 'â­', 'ðŸŽ‰', 'ðŸ†', 'âœ¨', 'ðŸ•', 'ðŸŽ¬', 'ðŸŽ®'];
+  return matches?.icons || [DEFAULT_REWARD_ICON, String.fromCodePoint(0x2B50), String.fromCodePoint(0x1F389), String.fromCodePoint(0x1F3C6), String.fromCodePoint(0x2728), String.fromCodePoint(0x1F355), String.fromCodePoint(0x1F3AC), String.fromCodePoint(0x1F3AE)];
 }
 
 function cleanNumber(value: string) {
@@ -571,7 +571,7 @@ export default function KidsScreen() {
                 {REWARD_IDEAS.map((idea) => (
                   <PressScale
                     key={idea.title}
-                    testID={eward-idea-}
+                    testID={idea.title}
                     onPress={() => {
                       setRewardMode('create');
                       setEditingReward(null);
@@ -627,7 +627,7 @@ export default function KidsScreen() {
 
               <View style={styles.tip}>
                 <Sparkles color={theme.colors.textMuted} size={14} />
-                <Text style={[styles.tipText, { color: theme.colors.textMuted }]}>Reward good habits Â· keep it fair</Text>
+                <Text style={[styles.tipText, { color: theme.colors.textMuted }]}>Reward good habits - keep it fair</Text>
               </View>
             </>
           )}
@@ -709,7 +709,7 @@ export default function KidsScreen() {
         <Text style={[styles.label, { color: theme.colors.textMuted }]}>Suggested icon</Text>
         <View style={styles.iconSuggestionRow}>
           {iconSuggestions.map((icon) => (
-            <PressScale key={icon} testID={`reward-icon-${icon}`} onPress={() => applyIconSuggestion(icon)} style={[styles.iconChip, { backgroundColor: rewardIcon === icon ? theme.colors.accentSoft : theme.colors.bgSoft, borderColor: rewardIcon === icon ? theme.colors.accent : theme.colors.cardBorder }]}>
+            <PressScale key={icon} testID={`reward-icon-${icon}`}>
               <Text style={styles.iconChipText}>{icon}</Text>
             </PressScale>
           ))}
@@ -751,7 +751,7 @@ export default function KidsScreen() {
             <Text style={[styles.modeText, { color: starMode === 'add' ? theme.colors.primaryText : theme.colors.textMuted }]}>Add</Text>
           </PressScale>
           <PressScale testID="mode-remove-stars" onPress={() => setStarMode('remove')} style={[styles.modeBtn, { backgroundColor: starMode === 'remove' ? theme.colors.primary : theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
-            <Text style={[styles.modeText, { color: starMode === 'remove' ? theme.colors.primaryText : theme.colors.textMuted }]}>âˆ’ Stars</Text>
+            <Text style={[styles.modeText, { color: starMode === 'remove' ? theme.colors.primaryText : theme.colors.textMuted }]}>- Stars</Text>
           </PressScale>
         </View>
 
