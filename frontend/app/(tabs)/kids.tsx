@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -324,6 +324,26 @@ export default function KidsScreen() {
     ]);
   };
 
+  const quickAddStars = async (amount: number) => {
+    if (!activeChild) {
+      showToast('Select a child first.', 'error');
+      return;
+    }
+
+    try {
+      const result = await api.adjustMemberStars(activeChild.member_id, {
+        delta: amount,
+        reason: amount === 1 ? 'Quick star' : `Quick +${amount} stars`,
+      });
+
+      setMembers((prev) => prev.map((member) => (member.member_id === result.member.member_id ? result.member : member)));
+      showToast(amount === 1 ? 'Added 1 star.' : `Added ${amount} stars.`, 'success');
+      await refreshHistory(activeChild.member_id);
+    } catch (e: any) {
+      logger.warn('Quick add stars failed:', e?.message || e);
+      showToast(e?.message || 'Could not add stars.', 'error');
+    }
+  };
   const adjustStars = async () => {
     if (!activeChild) return;
 
@@ -494,9 +514,9 @@ export default function KidsScreen() {
                   </View>
 
                   <View style={styles.heroActions}>
-                    <PressScale testID="kids-add-stars" onPress={() => openStarSheet('add', '5')} style={styles.heroActionBtn}>
+                    <PressScale testID="kids-add-stars" onPress={() => quickAddStars(1)} style={styles.heroActionBtn}>
                       <Plus color="#111827" size={16} />
-                      <Text style={styles.heroActionText}>Add stars</Text>
+                      <Text style={styles.heroActionText}>+1 star</Text>
                     </PressScale>
                     <PressScale testID="kids-remove-stars" onPress={() => openStarSheet('remove', '5')} style={styles.heroActionBtnSecondary}>
                       <MinusCircle color="#FFFFFF" size={16} />
@@ -508,7 +528,7 @@ export default function KidsScreen() {
 
               <View style={styles.quickRow}>
                 {['5', '10', '20'].map((amount) => (
-                  <PressScale key={amount} testID={`quick-stars-${amount}`} onPress={() => openStarSheet('add', amount)} style={[styles.quickBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+                  <PressScale key={amount} testID={`quick-stars-${amount}`} onPress={() => quickAddStars(parseInt(amount, 10))} style={[styles.quickBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
                     <Text style={[styles.quickText, { color: theme.colors.text }]}>+{amount}</Text>
                   </PressScale>
                 ))}
@@ -823,8 +843,8 @@ export default function KidsScreen() {
 
 const styles = StyleSheet.create({
   hiddenSection: { display: 'none' },
-  kidsSegmentWrap: { minHeight: 48, borderRadius: 9999, borderWidth: 1, padding: 6, flexDirection: 'row', gap: 6, marginBottom: 14 },
-  kidsSegmentBtn: { flex: 1, minHeight: 36, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  kidsSegmentWrap: { minHeight: 58, borderRadius: 9999, borderWidth: 1, padding: 8, flexDirection: 'row', gap: 10, marginBottom: 18 },
+  kidsSegmentBtn: { flex: 1, minHeight: 42, borderRadius: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   kidsSegmentText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },  container: { flex: 1 },
   safeArea: { flex: 1 },
   scroll: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 168 },
@@ -949,4 +969,5 @@ const styles = StyleSheet.create({
   deleteBtn: { flex: 1, minWidth: 126, borderWidth: 1, borderRadius: 18, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 7 },
   deleteText: { color: '#EF4444', fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
 });
+
 

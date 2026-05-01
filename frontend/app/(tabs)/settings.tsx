@@ -496,9 +496,9 @@ function SettingSwitch({ title, description, value, onValueChange, disabled }: {
 
 const styles = StyleSheet.create({
   hiddenSection: { display: 'none' },
-  settingsSegmentWrap: { minHeight: 48, borderRadius: 9999, borderWidth: 1, padding: 6, flexDirection: 'row', gap: 5, marginBottom: 14 },
-  settingsSegmentBtn: { flex: 1, minHeight: 36, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
-  settingsSegmentText: { fontFamily: 'Inter_800ExtraBold', fontSize: 11 },  container: { flex: 1 },
+  settingsSegmentWrap: { minHeight: 60, borderRadius: 9999, borderWidth: 1, padding: 8, flexDirection: 'row', gap: 8, marginBottom: 20 },
+  settingsSegmentBtn: { flex: 1, minHeight: 44, borderRadius: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  settingsSegmentText: { fontFamily: 'Inter_800ExtraBold', fontSize: 10.5 },  container: { flex: 1 },
   safe: { flex: 1 },
   scroll: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 150 },
   title: { fontFamily: 'Inter_800ExtraBold', fontSize: 34, lineHeight: 44, letterSpacing: -0.8 },
@@ -563,5 +563,6 @@ const styles = StyleSheet.create({
   primaryButton: { minHeight: 54, borderRadius: 9999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, flex: 1 },
   primaryButtonText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
 });
+
 
 
