@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,13 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import {
   ArrowRight,
   Bell,
-  CalendarDays,
+  CalendarDays,
+  Camera,
   CheckCircle2,
   Clock3,
-  FileText,
+  FileText,
+  Mic,
+  PlusCircle,
   ShieldCheck,
   Sparkles,
   Star,
@@ -27,11 +30,26 @@ import {
 import { AmbientBackground } from '../../src/components/AmbientBackground';
 import { GlassCard } from '../../src/components/GlassCard';
 import { PressScale } from '../../src/components/PressScale';
+import { AddCardModal } from '../../src/components/AddCardModal';
 import { SundayBriefModal } from '../../src/components/SundayBriefModal';
+import { VoiceCaptureModal } from '../../src/components/VoiceCaptureModal';
+import { CameraCaptureModal } from '../../src/components/CameraCaptureModal';
 import { useStore } from '../../src/store';
-import { api, Card, FamilyMember } from '../../src/api';
+import { api, Card, CardType, FamilyMember } from '../../src/api';
 import { syncCardReminderNotifications } from '../../src/notifications';
 import { logger } from '../../src/logger';
+
+interface VoiceDraft {
+  transcript: string;
+  type: CardType;
+  title: string;
+  description: string;
+  assignee: string;
+  due_date?: string | null;
+  image_base64?: string | null;
+  vault_category?: string;
+  save_to_vault?: boolean;
+}
 
 type Labels = {
   today: string;
@@ -65,12 +83,12 @@ function labelsFor(lang: string): Labels {
       capture: 'Capturer quelque chose',
       urgent: 'Urgent',
       calendarToday: 'Calendrier',
-      kidStars: 'Étoiles',
+      kidStars: 'Ã‰toiles',
       vaultDocs: 'Coffre',
-      needsAttention: 'À traiter',
+      needsAttention: 'Ã€ traiter',
       nothingUrgent: 'Rien de critique.',
-      nothingUrgentSub: 'Votre foyer est sous contrôle pour le moment.',
-      nextUp: 'À venir',
+      nothingUrgentSub: 'Votre foyer est sous contrÃ´le pour le moment.',
+      nextUp: 'Ã€ venir',
       quickActions: 'Actions rapides',
       scan: 'Scanner',
       voice: 'Voix',
@@ -91,18 +109,18 @@ function labelsFor(lang: string): Labels {
       urgent: 'Urgente',
       calendarToday: 'Calendario',
       kidStars: 'Estrellas',
-      vaultDocs: 'Bóveda',
-      needsAttention: 'Necesita atención',
-      nothingUrgent: 'Nada crítico.',
-      nothingUrgentSub: 'Tu hogar está bajo control por ahora.',
-      nextUp: 'Próximo',
-      quickActions: 'Acciones rápidas',
+      vaultDocs: 'BÃ³veda',
+      needsAttention: 'Necesita atenciÃ³n',
+      nothingUrgent: 'Nada crÃ­tico.',
+      nothingUrgentSub: 'Tu hogar estÃ¡ bajo control por ahora.',
+      nextUp: 'PrÃ³ximo',
+      quickActions: 'Acciones rÃ¡pidas',
       scan: 'Escanear',
       voice: 'Voz',
       manual: 'Manual',
       brief: 'Informe',
       calmScore: 'Calma',
-      scoreHelper: 'Menos atrasos, más calma.',
+      scoreHelper: 'Menos atrasos, mÃ¡s calma.',
       openNow: 'abiertos',
     };
   }
@@ -120,14 +138,14 @@ function labelsFor(lang: string): Labels {
       needsAttention: 'Braucht Aufmerksamkeit',
       nothingUrgent: 'Nichts Kritisches.',
       nothingUrgentSub: 'Ihr Haushalt ist im Moment unter Kontrolle.',
-      nextUp: 'Als Nächstes',
+      nextUp: 'Als NÃ¤chstes',
       quickActions: 'Schnellaktionen',
       scan: 'Scannen',
       voice: 'Stimme',
       manual: 'Manuell',
       brief: 'Brief',
       calmScore: 'Ruhe-Score',
-      scoreHelper: 'Weniger Rückstand, mehr Ruhe.',
+      scoreHelper: 'Weniger RÃ¼ckstand, mehr Ruhe.',
       openNow: 'offen',
     };
   }
@@ -198,6 +216,11 @@ export default function FeedScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showBrief, setShowBrief] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [showVoice, setShowVoice] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [addSource, setAddSource] = useState<'MANUAL' | 'VOICE' | 'CAMERA'>('MANUAL');
+  const [voiceDraft, setVoiceDraft] = useState<VoiceDraft | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -330,8 +353,8 @@ export default function FeedScreen() {
     const laterStart = todayStart + dayMs * 2;
     const weekEnd = todayStart + dayMs * 7;
 
-    const tomorrowLabel = lang === 'fr' ? 'Demain' : lang === 'es' ? 'MaÃ±ana' : lang === 'de' ? 'Morgen' : 'Tomorrow';
-    const laterLabel = lang === 'fr' ? 'Plus tard cette semaine' : lang === 'es' ? 'MÃ¡s tarde esta semana' : lang === 'de' ? 'SpÃ¤ter diese Woche' : 'Later this week';
+    const tomorrowLabel = lang === 'fr' ? 'Demain' : lang === 'es' ? 'MaÃƒÂ±ana' : lang === 'de' ? 'Morgen' : 'Tomorrow';
+    const laterLabel = lang === 'fr' ? 'Plus tard cette semaine' : lang === 'es' ? 'MÃƒÂ¡s tarde esta semana' : lang === 'de' ? 'SpÃƒÂ¤ter diese Woche' : 'Later this week';
 
     const items = dashboard.nextUp.filter((card) => {
       const time = dueTime(card);
@@ -398,6 +421,12 @@ export default function FeedScreen() {
   })();
 
   const firstName = (user?.name || '').split(' ')[0] || '';
+
+  const openManual = () => {
+    setVoiceDraft(null);
+    setAddSource('MANUAL');
+    setShowAdd(true);
+  };
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
       <AmbientBackground />
@@ -466,6 +495,22 @@ export default function FeedScreen() {
               <View style={styles.bushTwo} />
             </View>
 
+            <View testID="feed-quick-actions" style={styles.heroQuickActions}>
+              <PressScale testID="feed-action-voice" onPress={() => setShowVoice(true)} style={styles.heroQuickBtn}>
+                <Mic color="#202323" size={17} />
+                <Text style={styles.heroQuickText}>{labels.voice}</Text>
+              </PressScale>
+
+              <PressScale testID="feed-action-camera" onPress={() => setShowCamera(true)} style={styles.heroQuickBtn}>
+                <Camera color="#202323" size={17} />
+                <Text style={styles.heroQuickText}>{labels.scan}</Text>
+              </PressScale>
+
+              <PressScale testID="feed-action-manual" onPress={openManual} style={styles.heroQuickBtn}>
+                <PlusCircle color="#202323" size={17} />
+                <Text style={styles.heroQuickText}>{labels.manual}</Text>
+              </PressScale>
+            </View>
             <PressScale testID="open-brief" onPress={() => setShowBrief(true)} style={styles.heroAction}>
               <Text style={styles.heroActionText}>{t('sunday_brief')}</Text>
               <View style={styles.heroArrow}>
@@ -483,12 +528,12 @@ export default function FeedScreen() {
             <PressScale onPress={() => router.push('/calendar')} style={[styles.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
               <CalendarDays color={theme.colors.success} size={19} />
               <Text style={[styles.statValue, { color: theme.colors.text }]}>{dashboard.calendarToday.length}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{lang === 'fr' ? "Événement aujourd'hui" : labels.calendarToday}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{lang === 'fr' ? "Ã‰vÃ©nement aujourd'hui" : labels.calendarToday}</Text>
             </PressScale>
             <PressScale onPress={() => router.push('/kids')} style={[styles.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
               <Star color={theme.colors.accent} size={19} fill={theme.colors.accent} />
               <Text style={[styles.statValue, { color: theme.colors.text }]}>{totalStars}</Text>
-              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{lang === 'fr' ? 'Récompenses' : labels.kidStars}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{lang === 'fr' ? 'RÃ©compenses' : labels.kidStars}</Text>
             </PressScale>
             <PressScale onPress={() => router.push('/vault')} style={[styles.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
               <ShieldCheck color={theme.colors.success} size={19} />
@@ -500,7 +545,7 @@ export default function FeedScreen() {
             <GlassCard testID="reminders-banner" style={styles.remindersCard}>
               <View style={styles.remindersHeader}>
                 <Bell color={theme.colors.accent} size={16} />
-                <Text style={[styles.remindersTitle, { color: theme.colors.text }]}>{t('reminders')} · {upcomingReminders.length}</Text>
+                <Text style={[styles.remindersTitle, { color: theme.colors.text }]}>{t('reminders')} Â· {upcomingReminders.length}</Text>
               </View>
               {upcomingReminders.slice(0, 3).map((c) => {
                 const due = dueTime(c) || Date.now();
@@ -556,7 +601,7 @@ export default function FeedScreen() {
 
                     <Text style={[styles.priorityTitle, { color: theme.colors.text }]} numberOfLines={2}>{card.title}</Text>
 
-                    <Text style={[styles.priorityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+                    <Text style={[styles.priorityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Ã‚Â· {card.assignee || t('family')}</Text>
 
                   </View>
 
@@ -591,7 +636,7 @@ export default function FeedScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.plannerKicker, { color: theme.colors.textMuted }]}>{t('this_week')}</Text>
                 <Text style={[styles.plannerTitle, { color: theme.colors.text }]}>{labels.nextUp}</Text>
-                <Text style={[styles.plannerSub, { color: theme.colors.textMuted }]}>{weeklyAgenda.total} upcoming Â· {openCount} active</Text>
+                <Text style={[styles.plannerSub, { color: theme.colors.textMuted }]}>{weeklyAgenda.total} upcoming Ã‚Â· {openCount} active</Text>
               </View>
               <PressScale onPress={() => router.push('/calendar')} style={[styles.plannerViewAll, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
                 <Text style={[styles.plannerViewAllText, { color: theme.colors.text }]}>View all</Text>
@@ -618,7 +663,7 @@ export default function FeedScreen() {
                       <View style={[styles.agendaDot, { backgroundColor: card.source === 'CALENDAR' ? theme.colors.success : theme.colors.accent }]} />
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.agendaTitle, { color: theme.colors.text }]} numberOfLines={1}>{card.title}</Text>
-                        <Text style={[styles.agendaMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+                        <Text style={[styles.agendaMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Ã‚Â· {card.assignee || t('family')}</Text>
                       </View>
                       <View style={styles.agendaActions}>
                         <PressScale testID={`agenda-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.agendaDoneBtn, { backgroundColor: theme.colors.primary }]}>
@@ -651,7 +696,7 @@ export default function FeedScreen() {
                 <View key={`board-${card.card_id}`} style={[styles.boardMiniRow, { borderColor: theme.colors.cardBorder }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.boardMiniTitle, { color: theme.colors.text }]} numberOfLines={1}>{card.title}</Text>
-                    <Text style={[styles.boardMiniMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+                    <Text style={[styles.boardMiniMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Ã‚Â· {card.assignee || t('family')}</Text>
                   </View>
                   <View style={styles.boardMiniActions}>
                     <PressScale testID={`board-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.miniDoneButton, { backgroundColor: theme.colors.primary }]}>
@@ -668,7 +713,7 @@ export default function FeedScreen() {
           </GlassCard>
           <View style={styles.footerSignal}>
             <UsersRound color={theme.colors.textMuted} size={14} />
-            <Text style={[styles.footerSignalText, { color: theme.colors.textMuted }]}>Household COO · {childMembers.length} kids · {rewardCount} rewards</Text>
+            <Text style={[styles.footerSignalText, { color: theme.colors.textMuted }]}>Household COO Â· {childMembers.length} kids Â· {rewardCount} rewards</Text>
           </View>
 
           <View style={{ height: 120 }} />
@@ -680,6 +725,10 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
+  heroQuickActions: { flexDirection: 'row', gap: 10, marginTop: 18, marginBottom: 14 },
+  heroQuickBtn: { flex: 1, minHeight: 54, borderRadius: 9999, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  heroQuickText: { color: '#202323', fontFamily: 'Inter_800ExtraBold', fontSize: 11 },
+
   plannerCard: { marginBottom: 18, paddingVertical: 18, gap: 14 },
   plannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   plannerKicker: { fontFamily: 'Inter_800ExtraBold', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase' },
@@ -801,3 +850,4 @@ const styles = StyleSheet.create({
   footerSignal: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 22 },
   footerSignalText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, textAlign: 'center' },
 });
+
