@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Plus, X, Lock, Trash2, Stethoscope, BookOpen, Shield, Scale, AlertTriangle, CheckCircle2, Clock3, FileText, Search, Sparkles } from 'lucide-react-native';
+import { Plus, X, Lock, Trash2, Stethoscope, BookOpen, Shield, Scale, AlertTriangle, CheckCircle2, FileText, Search, Sparkles } from 'lucide-react-native';
 
 import { AmbientBackground } from '../../src/components/AmbientBackground';
 import { PressScale } from '../../src/components/PressScale';
@@ -180,7 +180,7 @@ export default function VaultScreen() {
             </PressScale>
           </View>
 
-          <View style={[styles.heroCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}> 
+          <View style={[styles.heroCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
             <View style={styles.heroCopy}>
               <View style={[styles.heroBadge, { backgroundColor: theme.colors.accentSoft }]}> 
                 <Sparkles color={theme.colors.accent} size={14} />
@@ -219,7 +219,7 @@ export default function VaultScreen() {
           </View>
 
           {attentionDocs.length === 0 ? (
-            <View style={[styles.attentionEmpty, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}> 
+            <View style={[styles.attentionEmpty, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
               <CheckCircle2 color={theme.colors.success} size={20} />
               <Text style={[styles.attentionEmptyText, { color: theme.colors.text }]}>No document needs attention right now.</Text>
             </View>
@@ -231,7 +231,7 @@ export default function VaultScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.attentionTitle, { color: theme.colors.text }]} numberOfLines={1}>{doc.title || 'Untitled document'}</Text>
-                  <Text style={[styles.attentionMeta, { color: theme.colors.textMuted }]}>{vaultStatus(doc)} Â· {doc.category}</Text>
+                  <Text style={[styles.attentionMeta, { color: theme.colors.textMuted }]}>{vaultStatus(doc)} - {doc.category}</Text>
                 </View>
               </PressScale>
             ))
@@ -348,16 +348,16 @@ export default function VaultScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  safeArea: { flex: 1 },
-  scroll: { paddingHorizontal: 20, paddingTop: 34, paddingBottom: 190 },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 26 },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 39, lineHeight: 45, letterSpacing: -0.8 },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 },
-  sub: { fontFamily: 'Inter_500Medium', fontSize: 15 },
-  addBtn: { width: 58, height: 58, borderRadius: 9999, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 5 },
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
+  scroll: { paddingHorizontal: 20, paddingTop: 34, paddingBottom: 130 },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
   kicker: { fontFamily: 'Inter_800ExtraBold', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1.1, marginBottom: 4 },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 39, lineHeight: 45, letterSpacing: -0.8 },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 5 },
+  sub: { fontFamily: 'Inter_500Medium', fontSize: 15 },
+  addBtn: { width: 58, height: 58, borderRadius: 9999, alignItems: 'center', justifyContent: 'center', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 16, elevation: 5 },
   heroCard: { minHeight: 176, borderRadius: 30, borderWidth: 1, padding: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 16, shadowOffset: { width: 0, height: 16 }, shadowOpacity: 0.10, shadowRadius: 24, elevation: 4 },
   heroCopy: { flex: 1 },
   heroBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 9999, marginBottom: 12 },
@@ -382,36 +382,37 @@ const styles = StyleSheet.create({
   attentionMeta: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 2 },
   ideaRail: { gap: 10, paddingRight: 12, paddingBottom: 4, marginBottom: 18 },
   ideaChip: { minHeight: 42, borderRadius: 9999, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  ideaText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'space-between' },
-  tile: { width: '48%', aspectRatio: 0.82, borderRadius: 24, borderWidth: 1, overflow: 'hidden', justifyContent: 'space-between', padding: 12, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.10, shadowRadius: 20, elevation: 4 },
-  tileImg: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
-  tileOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,42,0.46)' },
-  tileTop: { flexDirection: 'row' },
-  catPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderRadius: 9999 },
-  catText: { fontFamily: 'Inter_800ExtraBold', fontSize: 11, letterSpacing: 0.35 },
-  tileTitle: { color: '#FFFFFF', fontFamily: 'Inter_800ExtraBold', fontSize: 17, lineHeight: 22, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 10 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,9,16,0.5)' },
-  sheet: { borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 1, padding: 26, paddingBottom: 140 },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sheetTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 26, letterSpacing: -0.4 },
-  iconBtn: { padding: 9, borderRadius: 9999, borderWidth: 1 },
-  label: { fontFamily: 'Inter_800ExtraBold', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginTop: 14, marginBottom: 8 },
-  input: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, paddingVertical: 13, fontFamily: 'Inter_500Medium', fontSize: 16 },
-  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  catBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 9999, borderWidth: 1 },
-  catBtnLabel: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
-  pick: { marginTop: 18, height: 150, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  pickImg: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
-  pickText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  sheetFooter: { flexDirection: 'row', gap: 12, marginTop: 22 },
-  cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
-  cancelText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
-  saveBtn: { flex: 1, borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
-  saveText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
-  previewWrap: { flex: 1, padding: 24, justifyContent: 'center' },
-  previewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  previewTitle: { flex: 1, color: '#fff', fontFamily: 'Inter_800ExtraBold', fontSize: 24 },
-  previewActions: { flexDirection: 'row', gap: 8 },
-  previewIconBtn: { padding: 10, borderRadius: 9999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(15,23,42,0.55)' },
-  previewImg: { width: '100%', aspectRatio: 0.75, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
+  ideaText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, justifyContent: 'space-between' },
+  tile: { width: '48%', aspectRatio: 0.82, borderRadius: 24, borderWidth: 1, overflow: 'hidden', justifyContent: 'space-between', padding: 12, shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.10, shadowRadius: 20, elevation: 4 },
+  tileImg: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  tileOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15,23,42,0.46)' },
+  tileTop: { flexDirection: 'row' },
+  catPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderWidth: 1, borderRadius: 9999 },
+  catText: { fontFamily: 'Inter_800ExtraBold', fontSize: 11, letterSpacing: 0.35 },
+  tileTitle: { color: '#FFFFFF', fontFamily: 'Inter_800ExtraBold', fontSize: 17, lineHeight: 22, textShadowColor: 'rgba(0,0,0,0.45)', textShadowRadius: 10 },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(8,9,16,0.5)' },
+  sheet: { borderTopLeftRadius: 34, borderTopRightRadius: 34, borderWidth: 1, padding: 26, paddingBottom: 140 },
+  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sheetTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 26, letterSpacing: -0.4 },
+  iconBtn: { padding: 9, borderRadius: 9999, borderWidth: 1 },
+  label: { fontFamily: 'Inter_800ExtraBold', fontSize: 12, textTransform: 'uppercase', letterSpacing: 1, marginTop: 14, marginBottom: 8 },
+  input: { borderWidth: 1, borderRadius: 16, paddingHorizontal: 15, paddingVertical: 13, fontFamily: 'Inter_500Medium', fontSize: 16 },
+  catRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
+  catBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 10, borderRadius: 9999, borderWidth: 1 },
+  catBtnLabel: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
+  pick: { marginTop: 18, height: 150, borderRadius: 18, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  pickImg: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  pickText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  sheetFooter: { flexDirection: 'row', gap: 12, marginTop: 22 },
+  cancelBtn: { flex: 1, borderWidth: 1, borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
+  cancelText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
+  saveBtn: { flex: 1, borderRadius: 18, paddingVertical: 15, alignItems: 'center' },
+  saveText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
+  previewWrap: { flex: 1, padding: 24, justifyContent: 'center' },
+  previewTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  previewTitle: { flex: 1, color: '#fff', fontFamily: 'Inter_800ExtraBold', fontSize: 24 },
+  previewActions: { flexDirection: 'row', gap: 8 },
+  previewIconBtn: { padding: 10, borderRadius: 9999, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(15,23,42,0.55)' },
+  previewImg: { width: '100%', aspectRatio: 0.75, borderRadius: 24, borderWidth: 1, borderColor: 'rgba(255,255,255,0.16)' },
 });
