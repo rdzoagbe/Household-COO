@@ -10,49 +10,28 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import {
-  ArrowRight,
-  Bell,
-  CalendarDays,
-  Camera,
-  CheckCircle2,
-  Clock3,
-  FileText,
-  Trash2,
-  Mic,
-  PlusCircle,
-  Search,
-  ShieldCheck,
-  SlidersHorizontal,
-  Sparkles,
-  Star,
-  UsersRound,
+import {
+  ArrowRight,
+  Bell,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Trash2,
+  UsersRound,
 } from 'lucide-react-native';
 
 import { AmbientBackground } from '../../src/components/AmbientBackground';
 import { GlassCard } from '../../src/components/GlassCard';
 import { PressScale } from '../../src/components/PressScale';
-import { SmartCard } from '../../src/components/SmartCard';
-import { AddCardModal } from '../../src/components/AddCardModal';
 import { SundayBriefModal } from '../../src/components/SundayBriefModal';
-import { VoiceCaptureModal } from '../../src/components/VoiceCaptureModal';
-import { CameraCaptureModal } from '../../src/components/CameraCaptureModal';
 import { useStore } from '../../src/store';
-import { api, Card, CardType, FamilyMember } from '../../src/api';
+import { api, Card, FamilyMember } from '../../src/api';
 import { syncCardReminderNotifications } from '../../src/notifications';
 import { logger } from '../../src/logger';
-
-interface VoiceDraft {
-  transcript: string;
-  type: CardType;
-  title: string;
-  description: string;
-  assignee: string;
-  due_date?: string | null;
-  image_base64?: string | null;
-  vault_category?: string;
-  save_to_vault?: boolean;
-}
 
 type Labels = {
   today: string;
@@ -218,12 +197,7 @@ export default function FeedScreen() {
   const [vaultCount, setVaultCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
   const [showBrief, setShowBrief] = useState(false);
-  const [showVoice, setShowVoice] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
-  const [addSource, setAddSource] = useState<'MANUAL' | 'VOICE' | 'CAMERA'>('MANUAL');
-  const [voiceDraft, setVoiceDraft] = useState<VoiceDraft | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -299,14 +273,24 @@ export default function FeedScreen() {
       load();
     }
   };
-
+
+  const snooze = async (card: Card) => {
+    const base = card.due_date ? new Date(card.due_date) : new Date();
+    const nextDue = new Date(base.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    setCards((prev) => prev.map((c) => (c.card_id === card.card_id ? { ...c, due_date: nextDue } : c)));
+    try {
+      await api.updateCard(card.card_id, { due_date: nextDue });
+    } catch {
+      load();
+    }
+  };
   const activeCards = useMemo(() => cards.filter((c) => c.status === 'OPEN'), [cards]);
   const openCount = activeCards.length;
 
   const dashboard = useMemo(() => {
     const now = Date.now();
     const today = new Date();
-    const tomorrow = now + 24 * 60 * 60 * 1000;
+    const weekEnd = now + 7 * 24 * 60 * 60 * 1000;
 
     const overdue = activeCards.filter((card) => {
       const time = dueTime(card);
@@ -323,7 +307,7 @@ export default function FeedScreen() {
     const nextUp = activeCards
       .filter((card) => {
         const time = dueTime(card);
-        return Boolean(time && time >= now && time <= tomorrow);
+        return Boolean(time && time >= now && time <= weekEnd);
       })
       .sort((a, b) => (dueTime(a) || 0) - (dueTime(b) || 0));
 
@@ -337,7 +321,54 @@ export default function FeedScreen() {
 
     return { overdue, todayCards, calendarToday, adminCards, nextUp, priority, calmScore };
   }, [activeCards]);
-
+
+  const weeklyAgenda = useMemo(() => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const today = new Date();
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+    const tomorrowStart = todayStart + dayMs;
+    const laterStart = todayStart + dayMs * 2;
+    const weekEnd = todayStart + dayMs * 7;
+
+    const tomorrowLabel = lang === 'fr' ? 'Demain' : lang === 'es' ? 'MaÃ±ana' : lang === 'de' ? 'Morgen' : 'Tomorrow';
+    const laterLabel = lang === 'fr' ? 'Plus tard cette semaine' : lang === 'es' ? 'MÃ¡s tarde esta semana' : lang === 'de' ? 'SpÃ¤ter diese Woche' : 'Later this week';
+
+    const items = dashboard.nextUp.filter((card) => {
+      const time = dueTime(card);
+      return Boolean(time && time >= todayStart && time < weekEnd);
+    });
+
+    const sections = [
+      {
+        key: 'today',
+        title: labels.today,
+        cards: items.filter((card) => {
+          const time = dueTime(card) || 0;
+          return time >= todayStart && time < tomorrowStart;
+        }).slice(0, 3),
+      },
+      {
+        key: 'tomorrow',
+        title: tomorrowLabel,
+        cards: items.filter((card) => {
+          const time = dueTime(card) || 0;
+          return time >= tomorrowStart && time < laterStart;
+        }).slice(0, 3),
+      },
+      {
+        key: 'later',
+        title: laterLabel,
+        cards: items.filter((card) => {
+          const time = dueTime(card) || 0;
+          return time >= laterStart && time < weekEnd;
+        }).slice(0, 4),
+      },
+    ].filter((section) => section.cards.length > 0);
+
+    return { total: items.length, sections };
+  }, [dashboard.nextUp, labels.today, lang]);
+
+  const boardPreviewCards = useMemo(() => activeCards.slice(0, 6), [activeCards]);
   const childMembers = useMemo(() => members.filter((m) => m.role?.toLowerCase() === 'child'), [members]);
   const totalStars = useMemo(() => childMembers.reduce((sum, child) => sum + (child.stars || 0), 0), [childMembers]);
 
@@ -367,13 +398,6 @@ export default function FeedScreen() {
   })();
 
   const firstName = (user?.name || '').split(' ')[0] || '';
-
-  const openManual = () => {
-    setVoiceDraft(null);
-    setAddSource('MANUAL');
-    setShowAdd(true);
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
       <AmbientBackground />
@@ -405,16 +429,7 @@ export default function FeedScreen() {
               </View>
             )}
           </View>
-
-          <PressScale testID="command-capture" onPress={openManual} style={[styles.searchShell, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
-            <Search color={theme.colors.textSoft} size={21} />
-            <Text style={[styles.searchText, { color: theme.colors.textMuted }]}>{labels.capture}</Text>
-            <View style={[styles.filterButton, { backgroundColor: theme.colors.primary }]}>
-              <SlidersHorizontal color={theme.colors.primaryText} size={19} />
-            </View>
-          </PressScale>
-
-          <View style={[styles.commandHero, { shadowColor: theme.colors.shadow }]}>
+<View style={[styles.commandHero, { shadowColor: theme.colors.shadow }]}>
             <View style={styles.heroTopRow}>
               <View style={styles.heroBadge}>
                 <Sparkles color="#202323" size={13} />
@@ -481,30 +496,7 @@ export default function FeedScreen() {
               <Text style={[styles.statLabel, { color: theme.colors.textMuted }]}>{lang === 'fr' ? 'Tout va bien' : labels.vaultDocs}</Text>
             </PressScale>
           </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{labels.quickActions}</Text>
-          </View>
-          <View style={styles.actionRow}>
-            <PressScale onPress={() => setShowCamera(true)} style={[styles.actionTile, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
-              <Camera color={theme.colors.text} size={19} />
-              <Text style={[styles.actionText, { color: theme.colors.text }]}>{labels.scan}</Text>
-            </PressScale>
-            <PressScale onPress={() => setShowVoice(true)} style={[styles.actionTile, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
-              <Mic color={theme.colors.text} size={19} />
-              <Text style={[styles.actionText, { color: theme.colors.text }]}>{labels.voice}</Text>
-            </PressScale>
-            <PressScale onPress={openManual} style={[styles.actionTile, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
-              <PlusCircle color={theme.colors.text} size={19} />
-              <Text style={[styles.actionText, { color: theme.colors.text }]}>{labels.manual}</Text>
-            </PressScale>
-            <PressScale onPress={() => setShowBrief(true)} style={[styles.actionTile, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
-              <Sparkles color={theme.colors.text} size={19} />
-              <Text style={[styles.actionText, { color: theme.colors.text }]}>{labels.brief}</Text>
-            </PressScale>
-          </View>
-
-          {upcomingReminders.length > 0 && (
+{upcomingReminders.length > 0 && (
             <GlassCard testID="reminders-banner" style={styles.remindersCard}>
               <View style={styles.remindersHeader}>
                 <Bell color={theme.colors.accent} size={16} />
@@ -530,67 +522,150 @@ export default function FeedScreen() {
             <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>{dashboard.priority.length}</Text>
           </View>
 
-          {loading ? (
-            <ActivityIndicator color={theme.colors.text} style={{ marginTop: 40 }} />
-          ) : dashboard.priority.length === 0 ? (
-            <GlassCard style={styles.emptyPriority}>
-              <CheckCircle2 color={theme.colors.success} size={28} />
-              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{labels.nothingUrgent}</Text>
-              <Text style={[styles.emptySub, { color: theme.colors.textMuted }]}>{labels.nothingUrgentSub}</Text>
-            </GlassCard>
-          ) : (
-            dashboard.priority.slice(0, 4).map((card) => (
-              <GlassCard key={`priority-${card.card_id}`} style={styles.attentionCard}>
-                <View style={styles.attentionTopRow}>
-                  <View style={[styles.priorityIcon, { backgroundColor: card.type === 'TASK' ? theme.colors.bgSoft : theme.colors.accentSoft }]}>
-                    {card.type === 'TASK' ? <CheckCircle2 color={theme.colors.success} size={18} /> : <FileText color={theme.colors.accent} size={18} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.priorityTitle, { color: theme.colors.text }]} numberOfLines={2}>{card.title}</Text>
-                    <Text style={[styles.priorityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.attentionActions}>
-                  <PressScale testID={`attention-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.attentionDoneBtn, { backgroundColor: theme.colors.primary }]}>
-                    <CheckCircle2 color={theme.colors.primaryText} size={16} />
-                    <Text style={[styles.attentionDoneText, { color: theme.colors.primaryText }]}>Done</Text>
-                  </PressScale>
-                  <PressScale testID={`attention-delete-${card.card_id}`} onPress={() => remove(card)} style={[styles.attentionDeleteBtn, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
-                    <Trash2 color={theme.colors.textMuted} size={16} />
-                  </PressScale>
-                </View>
-              </GlassCard>
-            ))
-          )}
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{labels.nextUp}</Text>
-            <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>{dashboard.nextUp.length}</Text>
-          </View>
+          {loading ? (
 
-          {dashboard.nextUp.slice(0, 3).map((card) => (
-            <View key={`next-${card.card_id}`} style={[styles.nextRow, { borderColor: theme.colors.cardBorder }]}> 
-              <View style={[styles.nextDot, { backgroundColor: card.source === 'CALENDAR' ? theme.colors.success : theme.colors.accent }]} />
-              <Text style={[styles.nextTitle, { color: theme.colors.text }]} numberOfLines={1}>{card.title}</Text>
-              <Text style={[styles.nextTime, { color: theme.colors.textMuted }]}>{formatCardDate(card)}</Text>
-            </View>
-          ))}
+            <ActivityIndicator color={theme.colors.text} style={{ marginTop: 40 }} />
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t('this_week')}</Text>
-            <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>{openCount} active</Text>
-          </View>
+          ) : dashboard.priority.length === 0 ? (
 
-          {cards.length === 0 && !loading ? (
-            <GlassCard style={styles.empty}>
-              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{t('no_items')}</Text>
+            <GlassCard style={styles.emptyPriority}>
+
+              <CheckCircle2 color={theme.colors.success} size={28} />
+
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{labels.nothingUrgent}</Text>
+
+              <Text style={[styles.emptySub, { color: theme.colors.textMuted }]}>{labels.nothingUrgentSub}</Text>
+
             </GlassCard>
+
           ) : (
-            cards.map((c) => (
-              <SmartCard key={c.card_id} card={c} onComplete={() => toggle(c)} onDelete={() => remove(c)} />
+
+            dashboard.priority.slice(0, 4).map((card) => (
+
+              <GlassCard key={`priority-${card.card_id}`} style={styles.attentionCard}>
+
+                <View style={styles.attentionTopRow}>
+
+                  <View style={[styles.priorityIcon, { backgroundColor: card.type === 'TASK' ? theme.colors.bgSoft : theme.colors.accentSoft }]}>
+
+                    {card.type === 'TASK' ? <CheckCircle2 color={theme.colors.success} size={18} /> : <FileText color={theme.colors.accent} size={18} />}
+
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+
+                    <Text style={[styles.priorityTitle, { color: theme.colors.text }]} numberOfLines={2}>{card.title}</Text>
+
+                    <Text style={[styles.priorityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+
+                  </View>
+
+                </View>
+
+                <View style={styles.attentionActions}>
+
+                  <PressScale testID={`attention-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.attentionDoneBtn, { backgroundColor: theme.colors.primary }]}>
+
+                    <CheckCircle2 color={theme.colors.primaryText} size={16} />
+
+                    <Text style={[styles.attentionDoneText, { color: theme.colors.primaryText }]}>Done</Text>
+
+                  </PressScale>
+
+                  <PressScale testID={`attention-delete-${card.card_id}`} onPress={() => remove(card)} style={[styles.attentionDeleteBtn, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+
+                    <Trash2 color={theme.colors.textMuted} size={16} />
+
+                  </PressScale>
+
+                </View>
+
+              </GlassCard>
+
             ))
+
           )}
 
+          <GlassCard testID='weekly-planner' style={styles.plannerCard}>
+            <View style={styles.plannerHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.plannerKicker, { color: theme.colors.textMuted }]}>{t('this_week')}</Text>
+                <Text style={[styles.plannerTitle, { color: theme.colors.text }]}>{labels.nextUp}</Text>
+                <Text style={[styles.plannerSub, { color: theme.colors.textMuted }]}>{weeklyAgenda.total} upcoming Â· {openCount} active</Text>
+              </View>
+              <PressScale onPress={() => router.push('/calendar')} style={[styles.plannerViewAll, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+                <Text style={[styles.plannerViewAllText, { color: theme.colors.text }]}>View all</Text>
+                <ArrowRight color={theme.colors.text} size={15} />
+              </PressScale>
+            </View>
+
+            {weeklyAgenda.total === 0 ? (
+              <View style={styles.plannerEmpty}>
+                <CalendarDays color={theme.colors.success} size={22} />
+                <Text style={[styles.plannerEmptyTitle, { color: theme.colors.text }]}>Nothing planned this week.</Text>
+                <Text style={[styles.plannerSub, { color: theme.colors.textMuted }]}>Your calendar and household tasks are clear.</Text>
+              </View>
+            ) : (
+              weeklyAgenda.sections.map((section) => (
+                <View key={section.key} style={styles.plannerSection}>
+                  <View style={styles.plannerDayHeader}>
+                    <Text style={[styles.plannerDayTitle, { color: theme.colors.text }]}>{section.title}</Text>
+                    <Text style={[styles.plannerDayCount, { color: theme.colors.textMuted }]}>{section.cards.length}</Text>
+                  </View>
+
+                  {section.cards.map((card) => (
+                    <View key={`agenda-${card.card_id}`} style={[styles.agendaRow, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+                      <View style={[styles.agendaDot, { backgroundColor: card.source === 'CALENDAR' ? theme.colors.success : theme.colors.accent }]} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.agendaTitle, { color: theme.colors.text }]} numberOfLines={1}>{card.title}</Text>
+                        <Text style={[styles.agendaMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+                      </View>
+                      <View style={styles.agendaActions}>
+                        <PressScale testID={`agenda-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.agendaDoneBtn, { backgroundColor: theme.colors.primary }]}>
+                          <CheckCircle2 color={theme.colors.primaryText} size={15} />
+                        </PressScale>
+                        <PressScale testID={`agenda-snooze-${card.card_id}`} onPress={() => snooze(card)} style={[styles.agendaIconBtn, { borderColor: theme.colors.cardBorder }]}>
+                          <Clock3 color={theme.colors.textMuted} size={15} />
+                        </PressScale>
+                        <PressScale testID={`agenda-delete-${card.card_id}`} onPress={() => remove(card)} style={[styles.agendaIconBtn, { borderColor: theme.colors.cardBorder }]}>
+                          <Trash2 color={theme.colors.textMuted} size={15} />
+                        </PressScale>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ))
+            )}
+          </GlassCard>
+
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{t('this_week')}</Text>
+            <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>{boardPreviewCards.length}/{openCount} active</Text>
+          </View>
+
+          <GlassCard style={styles.boardPreviewCard}>
+            {boardPreviewCards.length === 0 && !loading ? (
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{t('no_items')}</Text>
+            ) : (
+              boardPreviewCards.map((card) => (
+                <View key={`board-${card.card_id}`} style={[styles.boardMiniRow, { borderColor: theme.colors.cardBorder }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.boardMiniTitle, { color: theme.colors.text }]} numberOfLines={1}>{card.title}</Text>
+                    <Text style={[styles.boardMiniMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+                  </View>
+                  <View style={styles.boardMiniActions}>
+                    <PressScale testID={`board-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.miniDoneButton, { backgroundColor: theme.colors.primary }]}>
+                      <CheckCircle2 color={theme.colors.primaryText} size={14} />
+                      <Text style={[styles.miniDoneText, { color: theme.colors.primaryText }]}>Done</Text>
+                    </PressScale>
+                    <PressScale testID={`board-delete-${card.card_id}`} onPress={() => remove(card)} style={[styles.miniDeleteButton, { borderColor: theme.colors.cardBorder }]}>
+                      <Trash2 color={theme.colors.textMuted} size={14} />
+                    </PressScale>
+                  </View>
+                </View>
+              ))
+            )}
+          </GlassCard>
           <View style={styles.footerSignal}>
             <UsersRound color={theme.colors.textMuted} size={14} />
             <Text style={[styles.footerSignalText, { color: theme.colors.textMuted }]}>Household COO · {childMembers.length} kids · {rewardCount} rewards</Text>
@@ -599,56 +674,40 @@ export default function FeedScreen() {
           <View style={{ height: 120 }} />
         </ScrollView>
       </SafeAreaView>
-
-      <CameraCaptureModal
-        visible={showCamera}
-        onClose={() => setShowCamera(false)}
-        onDraft={(d) => {
-          setVoiceDraft({
-            transcript: '',
-            type: d.type,
-            title: d.title,
-            description: d.description,
-            assignee: d.assignee,
-            due_date: d.due_date || null,
-            image_base64: d.image_base64 || null,
-            vault_category: d.vault_category || 'School',
-            save_to_vault: d.save_to_vault !== false,
-          });
-          setAddSource('CAMERA');
-          setShowCamera(false);
-          setShowAdd(true);
-        }}
-      />
-
-      <VoiceCaptureModal
-        visible={showVoice}
-        onClose={() => setShowVoice(false)}
-        onDraft={(d) => {
-          setVoiceDraft(d);
-          setAddSource('VOICE');
-          setShowVoice(false);
-          setShowAdd(true);
-        }}
-      />
-
-      <AddCardModal
-        visible={showAdd}
-        onClose={() => {
-          setShowAdd(false);
-          setVoiceDraft(null);
-        }}
-        onCreated={load}
-        initialSource={addSource}
-        initialDraft={voiceDraft}
-      />
-      <SundayBriefModal visible={showBrief} onClose={() => setShowBrief(false)} />
+<SundayBriefModal visible={showBrief} onClose={() => setShowBrief(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  plannerCard: { marginBottom: 18, paddingVertical: 18, gap: 14 },
+  plannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  plannerKicker: { fontFamily: 'Inter_800ExtraBold', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase' },
+  plannerTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 25, letterSpacing: -0.8, marginTop: 2 },
+  plannerSub: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 3 },
+  plannerViewAll: { minHeight: 38, borderRadius: 999, borderWidth: 1, paddingHorizontal: 13, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  plannerViewAllText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
+  plannerEmpty: { minHeight: 104, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  plannerEmptyTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
+  plannerSection: { gap: 8, marginTop: 2 },
+  plannerDayHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  plannerDayTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
+  plannerDayCount: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
+  agendaRow: { minHeight: 62, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  agendaDot: { width: 9, height: 9, borderRadius: 99 },
+  agendaTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+  agendaMeta: { fontFamily: 'Inter_600SemiBold', fontSize: 11, marginTop: 2 },
+  agendaActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  agendaDoneBtn: { width: 34, height: 34, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  agendaIconBtn: { width: 34, height: 34, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  boardPreviewCard: { marginBottom: 18, paddingVertical: 8 },
+  boardMiniRow: { minHeight: 58, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 },
+  boardMiniTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+  boardMiniMeta: { fontFamily: 'Inter_600SemiBold', fontSize: 11, marginTop: 2 },
+  boardMiniActions: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  miniDoneButton: { minHeight: 32, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingHorizontal: 10 },
+  miniDoneText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
+  miniDeleteButton: { width: 32, height: 32, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },  container: { flex: 1 },
   scroll: { paddingHorizontal: 24, paddingTop: 10 },
   header: {
     flexDirection: 'row',
@@ -663,23 +722,6 @@ const styles = StyleSheet.create({
   avatar: { width: 50, height: 50, borderRadius: 9999, borderWidth: 1 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: 'Inter_800ExtraBold', fontSize: 17 },
-  searchShell: {
-    minHeight: 66,
-    borderRadius: 9999,
-    borderWidth: 1,
-    paddingLeft: 20,
-    paddingRight: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 24,
-    shadowOpacity: 0.10,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
-  },
-  searchText: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 16 },
-  filterButton: { width: 52, height: 52, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
   commandHero: {
     position: 'relative',
     minHeight: 372,
@@ -728,9 +770,6 @@ const styles = StyleSheet.create({
   section: { marginBottom: 13, marginTop: 4, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   sectionTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 23, letterSpacing: -0.4 },
   sectionSub: { fontFamily: 'Inter_700Bold', fontSize: 13 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 22 },
-  actionTile: { flex: 1, minHeight: 74, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 8 },
-  actionText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },
   remindersCard: { marginBottom: 20 },
   remindersHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   remindersTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 13, letterSpacing: 0.6, textTransform: 'uppercase' },
@@ -741,11 +780,16 @@ const styles = StyleSheet.create({
   empty: { paddingVertical: 36, alignItems: 'center' },
   emptyTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 21, textAlign: 'center' },
   emptySub: { fontFamily: 'Inter_500Medium', fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 270 },
-  attentionCard: { marginBottom: 12, borderRadius: 26, paddingVertical: 14 },
-  attentionTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  attentionActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
-  attentionDoneBtn: { flex: 1, minHeight: 44, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 14 },
-  attentionDoneText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+  attentionCard: { marginBottom: 12, borderRadius: 26, paddingVertical: 14 },
+
+  attentionTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+
+  attentionActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+
+  attentionDoneBtn: { flex: 1, minHeight: 44, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 14 },
+
+  attentionDoneText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+
   attentionDeleteBtn: { minWidth: 44, minHeight: 44, borderRadius: 9999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },  priorityCard: { minHeight: 82, borderRadius: 26, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14, marginBottom: 10, shadowOpacity: 0.08, shadowRadius: 13, shadowOffset: { width: 0, height: 8 }, elevation: 2 },
   priorityIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   priorityTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 16, lineHeight: 21 },
