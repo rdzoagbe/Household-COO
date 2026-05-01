@@ -421,12 +421,30 @@ export default function FeedScreen() {
   })();
 
   const firstName = (user?.name || '').split(' ')[0] || '';
+  const openVoiceCapture = () => {
+    setShowAdd(false);
+    setShowCamera(false);
+    setVoiceDraft(null);
+    setAddSource('VOICE');
+    setShowVoice(true);
+  };
 
-  const openManual = () => {
+  const openCameraCapture = () => {
+    setShowAdd(false);
+    setShowVoice(false);
+    setVoiceDraft(null);
+    setAddSource('CAMERA');
+    setShowCamera(true);
+  };
+
+  const openManualCapture = () => {
+    setShowVoice(false);
+    setShowCamera(false);
     setVoiceDraft(null);
     setAddSource('MANUAL');
     setShowAdd(true);
   };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
       <AmbientBackground />
@@ -496,17 +514,17 @@ export default function FeedScreen() {
             </View>
 
             <View testID="feed-quick-actions" style={styles.heroQuickActions}>
-              <PressScale testID="feed-action-voice" onPress={() => setShowVoice(true)} style={styles.heroQuickBtn}>
+              <PressScale testID="feed-action-voice" onPress={openVoiceCapture} style={styles.heroQuickBtn}>
                 <Mic color="#202323" size={17} />
                 <Text style={styles.heroQuickText}>{labels.voice}</Text>
               </PressScale>
 
-              <PressScale testID="feed-action-camera" onPress={() => setShowCamera(true)} style={styles.heroQuickBtn}>
+              <PressScale testID="feed-action-camera" onPress={openCameraCapture} style={styles.heroQuickBtn}>
                 <Camera color="#202323" size={17} />
                 <Text style={styles.heroQuickText}>{labels.scan}</Text>
               </PressScale>
 
-              <PressScale testID="feed-action-manual" onPress={openManual} style={styles.heroQuickBtn}>
+              <PressScale testID="feed-action-manual" onPress={openManualCapture} style={styles.heroQuickBtn}>
                 <PlusCircle color="#202323" size={17} />
                 <Text style={styles.heroQuickText}>{labels.manual}</Text>
               </PressScale>
@@ -850,5 +868,6 @@ const styles = StyleSheet.create({
   footerSignal: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 22 },
   footerSignalText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, textAlign: 'center' },
 });
+
 
 
