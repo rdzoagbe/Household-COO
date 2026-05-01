@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, Platform, ScrollView, Share, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -14,6 +14,8 @@ import { useStore } from '../../src/store';
 import { api, CalendarContact, Entitlements, FamilyInvite, FamilyMember, NotificationSettings } from '../../src/api';
 import { LANG_NAMES } from '../../src/i18n';
 import { ensureNotificationPermissions, registerForPushNotificationsAsync, sendLocalNotification, sendTestScheduledReminderNotification, syncCardReminderNotifications } from '../../src/notifications';
+
+type SettingsView = 'plan' | 'alerts' | 'prefs' | 'family' | 'security';
 
 function formatBytes(bytes?: number | null) {
   const value = bytes || 0;
@@ -39,6 +41,7 @@ export default function SettingsScreen() {
   const [notificationStatus, setNotificationStatus] = useState<string | null>(null);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [entitlements, setEntitlements] = useState<Entitlements | null>(null);
+  const [activeSettingsView, setActiveSettingsView] = useState<SettingsView>('plan');
 
   const load = useCallback(async () => {
     try {
@@ -188,34 +191,49 @@ export default function SettingsScreen() {
                 {user?.is_admin ? (
                   <View style={[styles.badge, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.accent }]}>
                     <Crown color={theme.colors.accent} size={16} />
-                    <Text style={[styles.badgeText, { color: theme.colors.accent }]}>Admin / Tester · all features unlocked</Text>
+                    <Text style={[styles.badgeText, { color: theme.colors.accent }]}>Admin / Tester Â· all features unlocked</Text>
                   </View>
                 ) : null}
               </View>
             </View>
-          </GlassCard>
-
-          <SectionTitle icon={<ShieldCheck color={theme.colors.textMuted} size={18} />} label="Plan & access" color={theme.colors.textMuted} />
-          <GlassCard>
+          </GlassCard>
+          <View style={[styles.settingsSegmentWrap, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}> 
+            {([
+              { key: 'plan', label: 'Plan' },
+              { key: 'alerts', label: 'Alerts' },
+              { key: 'prefs', label: 'Prefs' },
+              { key: 'family', label: 'Family' },
+              { key: 'security', label: 'Security' },
+            ] as const).map((item) => {
+              const active = activeSettingsView === item.key;
+              return (
+                <PressScale key={item.key} onPress={() => setActiveSettingsView(item.key)} style={[styles.settingsSegmentBtn, active && { backgroundColor: theme.colors.primary }]}>
+                  <Text style={[styles.settingsSegmentText, { color: active ? theme.colors.primaryText : theme.colors.textMuted }]}>{item.label}</Text>
+                </PressScale>
+              );
+            })}
+          </View>
+          <SectionTitle hidden={activeSettingsView !== 'plan'} icon={<ShieldCheck color={theme.colors.textMuted} size={18} />} label="Plan & access" color={theme.colors.textMuted} />
+          <GlassCard style={[activeSettingsView !== 'plan' && styles.hiddenSection]}>
             <View style={styles.cardHeaderRow}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: theme.colors.text }]}>{user?.is_admin ? 'Admin / Tester' : planLabel}</Text>
-                <Text style={[styles.cardSub, { color: theme.colors.textMuted }]}>{user?.is_admin ? 'All feature gates are bypassed for testing.' : `${memberSlotsUsed}/${memberLimit || '∞'} member slots used`}</Text>
+                <Text style={[styles.cardSub, { color: theme.colors.textMuted }]}>{user?.is_admin ? 'All feature gates are bypassed for testing.' : `${memberSlotsUsed}/${memberLimit || 'âˆž'} member slots used`}</Text>
               </View>
               <PressScale testID="open-pricing" onPress={() => router.push('/pricing')} style={[styles.primaryPill, { backgroundColor: theme.colors.primary }]}>
                 <Text style={[styles.primaryPillText, { color: theme.colors.primaryText }]}>View plans</Text>
               </PressScale>
             </View>
             <View style={styles.statGrid}>
-              <StatBox label="Members" value={`${memberSlotsUsed}/${memberLimit || '∞'}`} />
-              <StatBox label="AI scans" value={entitlements ? `${entitlements.ai_scans_used}/${entitlements.ai_scans_limit}` : `${subscription?.ai_scans_used ?? 0}/${subscription?.limits?.ai_scans_per_month ?? '∞'}`} />
+              <StatBox label="Members" value={`${memberSlotsUsed}/${memberLimit || 'âˆž'}`} />
+              <StatBox label="AI scans" value={entitlements ? `${entitlements.ai_scans_used}/${entitlements.ai_scans_limit}` : `${subscription?.ai_scans_used ?? 0}/${subscription?.limits?.ai_scans_per_month ?? 'âˆž'}`} />
               <StatBox label="Vault" value={formatBytes(entitlements?.vault_bytes_used ?? subscription?.vault_bytes_used)} />
               <StatBox label="Weekly brief" value={entitlements?.weekly_brief || subscription?.limits?.weekly_brief ? 'On' : 'Locked'} />
             </View>
           </GlassCard>
 
-          <SectionTitle icon={<Bell color={theme.colors.textMuted} size={18} />} label="Notifications" color={theme.colors.textMuted} />
-          <GlassCard>
+          <SectionTitle hidden={activeSettingsView !== 'alerts'} icon={<Bell color={theme.colors.textMuted} size={18} />} label="Notifications" color={theme.colors.textMuted} />
+          <GlassCard style={[activeSettingsView !== 'alerts' && styles.hiddenSection]}>
             <SettingSwitch
               title="Reminder notifications"
               description="Alerts before cards with due dates and reminder times."
@@ -238,8 +256,8 @@ export default function SettingsScreen() {
             <Text style={[styles.note, { color: theme.colors.textMuted }]}>{notificationStatus || 'Use a development build for full push notification testing.'}</Text>
           </GlassCard>
 
-          <SectionTitle icon={<Globe color={theme.colors.textMuted} size={18} />} label="Preferences" color={theme.colors.textMuted} />
-          <GlassCard>
+          <SectionTitle hidden={activeSettingsView !== 'prefs'} icon={<Globe color={theme.colors.textMuted} size={18} />} label="Preferences" color={theme.colors.textMuted} />
+          <GlassCard style={[activeSettingsView !== 'prefs' && styles.hiddenSection]}>
             <View style={styles.preferenceHeader}>
               <View style={styles.preferenceTitleRow}>
                 {appearanceMode === 'light' ? <Sun color={theme.colors.accent} size={22} /> : <Moon color={theme.colors.accent} size={22} />}
@@ -271,8 +289,8 @@ export default function SettingsScreen() {
             </PressScale>
           </GlassCard>
 
-          <SectionTitle icon={<Users color={theme.colors.textMuted} size={18} />} label="Family" color={theme.colors.textMuted} />
-          <GlassCard>
+          <SectionTitle hidden={activeSettingsView !== 'family'} icon={<Users color={theme.colors.textMuted} size={18} />} label="Family" color={theme.colors.textMuted} />
+          <GlassCard style={[activeSettingsView !== 'family' && styles.hiddenSection]}>
             {members.length === 0 ? <EmptyText text="No family members yet." /> : members.map((member, index) => (
               <View key={member.member_id}>
                 {index > 0 ? <Divider /> : null}
@@ -288,9 +306,9 @@ export default function SettingsScreen() {
               </View>
             ))}
           </GlassCard>
-          <SecondaryButton label="Invite co-parent" onPress={() => openInvite()} icon={<UserPlus color={theme.colors.text} size={20} />} />
+          <SecondaryButton label="Invite co-parent" onPress={() => openInvite()} icon={<UserPlus color={theme.colors.text} size={20} />} hidden={activeSettingsView !== 'family'} />
 
-          <GlassCard style={styles.topGap}>
+          <GlassCard style={[styles.topGap, activeSettingsView !== 'family' && styles.hiddenSection]}>
             <Text style={[styles.cardTitle, { color: theme.colors.text }]}>Invite status</Text>
             {invites.length === 0 ? <EmptyText text="No invites created yet." /> : invites.map((invite) => (
               <View key={invite.invite_id} style={styles.inviteRow}>
@@ -303,8 +321,8 @@ export default function SettingsScreen() {
             ))}
           </GlassCard>
 
-          <SectionTitle icon={<CalendarDays color={theme.colors.textMuted} size={18} />} label="Calendar contacts" color={theme.colors.textMuted} />
-          <GlassCard>
+          <SectionTitle hidden={activeSettingsView !== 'family'} icon={<CalendarDays color={theme.colors.textMuted} size={18} />} label="Calendar contacts" color={theme.colors.textMuted} />
+          <GlassCard style={[activeSettingsView !== 'family' && styles.hiddenSection]}>
             {calendarContacts.length === 0 ? <EmptyText text="No calendar contacts found yet. Sync Google Calendar from the Calendar tab." /> : calendarContacts.slice(0, 8).map((contact, index) => (
               <View key={contact.email}>
                 {index > 0 ? <Divider /> : null}
@@ -324,8 +342,8 @@ export default function SettingsScreen() {
             ))}
           </GlassCard>
 
-          <SectionTitle icon={<Lock color={theme.colors.textMuted} size={18} />} label="Kid PINs" color={theme.colors.textMuted} />
-          <GlassCard>
+          <SectionTitle hidden={activeSettingsView !== 'security'} icon={<Lock color={theme.colors.textMuted} size={18} />} label="Kid PINs" color={theme.colors.textMuted} />
+          <GlassCard style={[activeSettingsView !== 'security' && styles.hiddenSection]}>
             {childMembers.length === 0 ? <EmptyText text="No children to secure." /> : childMembers.map((member) => (
               <PressScale key={member.member_id} testID={`set-pin-${member.member_id}`} onPress={() => setPinMember(member)} style={styles.memberRow}>
                 <View style={[styles.memberAvatar, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
@@ -333,7 +351,7 @@ export default function SettingsScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.memberName, { color: theme.colors.text }]}>{member.name}</Text>
-                  <Text style={[styles.memberRole, { color: theme.colors.textMuted }]}>{member.has_pin ? 'PIN set · tap to change' : 'No PIN · tap to add'}</Text>
+                  <Text style={[styles.memberRole, { color: theme.colors.textMuted }]}>{member.has_pin ? 'PIN set Â· tap to change' : 'No PIN Â· tap to add'}</Text>
                 </View>
                 {member.has_pin ? <Lock color={theme.colors.accent} size={18} /> : <ChevronRight color={theme.colors.textSoft} size={22} />}
               </PressScale>
@@ -423,8 +441,8 @@ export default function SettingsScreen() {
   );
 }
 
-function SectionTitle({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
-  return <View style={styles.sectionRow}>{icon}<Text style={[styles.sectionLabel, { color }]}>{label}</Text></View>;
+function SectionTitle({ icon, label, color, hidden }: { icon: React.ReactNode; label: string; color: string; hidden?: boolean }) {
+  return <View style={[styles.sectionRow, hidden && styles.hiddenSection]}>{icon}<Text style={[styles.sectionLabel, { color }]}>{label}</Text></View>;
 }
 
 function Divider() {
@@ -447,10 +465,10 @@ function StatBox({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SecondaryButton({ label, onPress, testID, icon, compact }: { label: string; onPress: () => void; testID?: string; icon?: React.ReactNode; compact?: boolean }) {
+function SecondaryButton({ label, onPress, testID, icon, compact, hidden }: { label: string; onPress: () => void; testID?: string; icon?: React.ReactNode; compact?: boolean; hidden?: boolean }) {
   const { theme } = useStore();
   return (
-    <PressScale testID={testID} onPress={onPress} style={[styles.secondaryButton, compact && styles.secondaryButtonCompact, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.card }]}>
+    <PressScale testID={testID} onPress={onPress} style={[styles.secondaryButton, compact && styles.secondaryButtonCompact, hidden && styles.hiddenSection, { borderColor: theme.colors.cardBorder, backgroundColor: theme.colors.card }]}>
       {icon}
       <Text style={[styles.secondaryButtonText, { color: theme.colors.text }]}>{label}</Text>
     </PressScale>
@@ -477,12 +495,15 @@ function SettingSwitch({ title, description, value, onValueChange, disabled }: {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  hiddenSection: { display: 'none' },
+  settingsSegmentWrap: { minHeight: 48, borderRadius: 9999, borderWidth: 1, padding: 6, flexDirection: 'row', gap: 5, marginBottom: 14 },
+  settingsSegmentBtn: { flex: 1, minHeight: 36, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  settingsSegmentText: { fontFamily: 'Inter_800ExtraBold', fontSize: 11 },  container: { flex: 1 },
   safe: { flex: 1 },
-  scroll: { paddingHorizontal: 20, paddingTop: 34, paddingBottom: 190 },
-  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 38, lineHeight: 44, letterSpacing: -0.8 },
+  scroll: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 150 },
+  title: { fontFamily: 'Inter_800ExtraBold', fontSize: 34, lineHeight: 44, letterSpacing: -0.8 },
   subtitle: { fontFamily: 'Inter_500Medium', fontSize: 16, lineHeight: 23, marginTop: 6, marginBottom: 18 },
-  profileCard: { marginBottom: 22 },
+  profileCard: { marginBottom: 14 },
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   avatar: { width: 76, height: 76, borderRadius: 9999, borderWidth: 1 },
   avatarFallback: { alignItems: 'center', justifyContent: 'center' },
@@ -492,7 +513,7 @@ const styles = StyleSheet.create({
   email: { fontFamily: 'Inter_500Medium', fontSize: 15, flex: 1 },
   badge: { alignSelf: 'flex-start', marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9999, borderWidth: 1 },
   badgeText: { fontFamily: 'Inter_800ExtraBold', fontSize: 13 },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 26, marginBottom: 14 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 14, marginBottom: 14 },
   sectionLabel: { fontFamily: 'Inter_800ExtraBold', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.2 },
   cardHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   cardTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 21, lineHeight: 27 },
@@ -500,7 +521,7 @@ const styles = StyleSheet.create({
   primaryPill: { minHeight: 48, borderRadius: 9999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center' },
   primaryPillText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 18 },
-  statBox: { width: '48%', minHeight: 104, borderRadius: 22, borderWidth: 1, padding: 16, justifyContent: 'center' },
+  statBox: { width: '48%', minHeight: 82, borderRadius: 22, borderWidth: 1, padding: 16, justifyContent: 'center' },
   statValue: { fontFamily: 'Inter_800ExtraBold', fontSize: 22, lineHeight: 27 },
   statLabel: { fontFamily: 'Inter_500Medium', fontSize: 14, marginTop: 6 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 4 },
@@ -516,7 +537,7 @@ const styles = StyleSheet.create({
   segmentText: { fontFamily: 'Inter_800ExtraBold', fontSize: 18 },
   navRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 56 },
   navRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  divider: { height: 1, opacity: 0.9, marginVertical: 18 },
+  divider: { height: 1, opacity: 0.9, marginVertical: 12 },
   memberRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 10 },
   memberAvatar: { width: 58, height: 58, borderRadius: 9999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   memberInitial: { fontFamily: 'Inter_800ExtraBold', fontSize: 18 },
@@ -542,6 +563,5 @@ const styles = StyleSheet.create({
   primaryButton: { minHeight: 54, borderRadius: 9999, paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, flex: 1 },
   primaryButtonText: { fontFamily: 'Inter_800ExtraBold', fontSize: 15 },
 });
-
 
 

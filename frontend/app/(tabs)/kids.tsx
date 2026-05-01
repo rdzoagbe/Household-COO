@@ -46,6 +46,7 @@ type ToastState = {
 
 type RewardSheetMode = 'create' | 'edit';
 type StarMode = 'add' | 'remove';
+type KidsView = 'overview' | 'rewards' | 'activity';
 
 const DEFAULT_REWARD_ICON = String.fromCodePoint(0x1F381);
 
@@ -94,6 +95,7 @@ export default function KidsScreen() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
+  const [activeKidsView, setActiveKidsView] = useState<KidsView>('overview');
 
   const [showAddMenu, setShowAddMenu] = useState(false);
 
@@ -513,9 +515,22 @@ export default function KidsScreen() {
                 <PressScale testID="quick-stars-custom" onPress={() => openStarSheet('add', '')} style={[styles.quickBtn, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
                   <Text style={[styles.quickText, { color: theme.colors.text }]}>Custom</Text>
                 </PressScale>
+              </View>
+              <View style={[styles.kidsSegmentWrap, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}> 
+                {([
+                  { key: 'overview', label: 'Overview' },
+                  { key: 'rewards', label: 'Rewards' },
+                  { key: 'activity', label: 'Activity' },
+                ] as const).map((item) => {
+                  const active = activeKidsView === item.key;
+                  return (
+                    <PressScale key={item.key} onPress={() => setActiveKidsView(item.key)} style={[styles.kidsSegmentBtn, active && { backgroundColor: theme.colors.primary }]}>
+                      <Text style={[styles.kidsSegmentText, { color: active ? theme.colors.primaryText : theme.colors.textMuted }]}>{item.label}</Text>
+                    </PressScale>
+                  );
+                })}
               </View>
-
-              <View style={styles.statRow}>
+              <View style={[styles.statRow, activeKidsView !== 'overview' && styles.hiddenSection]}>
                 <View style={[styles.statCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
                   <Text style={[styles.statEyebrow, { color: theme.colors.textMuted }]}>Reward shop</Text>
                   <Text style={[styles.statValue, { color: theme.colors.text }]}>{affordableRewards}</Text>
@@ -528,7 +543,7 @@ export default function KidsScreen() {
                 </View>
               </View>
 
-              <GlassCard style={styles.historyCard}>
+              <GlassCard style={[styles.historyCard, activeKidsView === 'rewards' && styles.hiddenSection]}>
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionRowInline}>
                     <History color={theme.colors.textMuted} size={16} />
@@ -556,7 +571,7 @@ export default function KidsScreen() {
                   })
                 )}
               </GlassCard>
-              <View style={[styles.rewardShopShell, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
+              <View style={[styles.rewardShopShell, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }, activeKidsView !== 'rewards' && styles.hiddenSection]}>
                 <View style={styles.rewardShopHeaderCard}>
                   <View style={[styles.rewardShopBadge, { backgroundColor: theme.colors.accentSoft, borderColor: theme.colors.cardBorder }]}>
                     <Gift color={theme.colors.accent} size={18} />
@@ -645,7 +660,6 @@ export default function KidsScreen() {
           <View style={{ height: 170 }} />
         </ScrollView>
       </SafeAreaView>
-
 
       <KeyboardAwareBottomSheet visible={showAddMenu} onClose={() => setShowAddMenu(false)} contentStyle={[styles.sheet, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder }]}>
         <View style={styles.sheetHeader}>
@@ -808,7 +822,10 @@ export default function KidsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  hiddenSection: { display: 'none' },
+  kidsSegmentWrap: { minHeight: 48, borderRadius: 9999, borderWidth: 1, padding: 6, flexDirection: 'row', gap: 6, marginBottom: 14 },
+  kidsSegmentBtn: { flex: 1, minHeight: 36, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
+  kidsSegmentText: { fontFamily: 'Inter_800ExtraBold', fontSize: 12 },  container: { flex: 1 },
   safeArea: { flex: 1 },
   scroll: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 168 },
   titleRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16, marginTop: 4, zIndex: 5 },
