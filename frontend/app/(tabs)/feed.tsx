@@ -17,7 +17,8 @@ import {
   Camera,
   CheckCircle2,
   Clock3,
-  FileText,
+  FileText,
+  Trash2,
   Mic,
   PlusCircle,
   Search,
@@ -32,7 +33,6 @@ import { AmbientBackground } from '../../src/components/AmbientBackground';
 import { GlassCard } from '../../src/components/GlassCard';
 import { PressScale } from '../../src/components/PressScale';
 import { SmartCard } from '../../src/components/SmartCard';
-import { FloatingActionBar } from '../../src/components/FloatingActionBar';
 import { AddCardModal } from '../../src/components/AddCardModal';
 import { SundayBriefModal } from '../../src/components/SundayBriefModal';
 import { VoiceCaptureModal } from '../../src/components/VoiceCaptureModal';
@@ -530,29 +530,39 @@ export default function FeedScreen() {
             <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>{dashboard.priority.length}</Text>
           </View>
 
-          {loading ? (
-            <ActivityIndicator color={theme.colors.text} style={{ marginTop: 40 }} />
-          ) : dashboard.priority.length === 0 ? (
-            <GlassCard style={styles.emptyPriority}>
-              <CheckCircle2 color={theme.colors.success} size={28} />
-              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{labels.nothingUrgent}</Text>
-              <Text style={[styles.emptySub, { color: theme.colors.textMuted }]}>{labels.nothingUrgentSub}</Text>
-            </GlassCard>
-          ) : (
-            dashboard.priority.slice(0, 3).map((card) => (
-              <PressScale key={`priority-${card.card_id}`} style={[styles.priorityCard, { backgroundColor: theme.colors.card, borderColor: theme.colors.cardBorder, shadowColor: theme.colors.shadow }]}>
-                <View style={[styles.priorityIcon, { backgroundColor: card.type === 'TASK' ? theme.colors.bgSoft : theme.colors.accentSoft }]}> 
-                  {card.type === 'TASK' ? <CheckCircle2 color={theme.colors.success} size={18} /> : <FileText color={theme.colors.accent} size={18} />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.priorityTitle, { color: theme.colors.text }]} numberOfLines={1}>{card.title}</Text>
-                  <Text style={[styles.priorityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} · {card.assignee || t('family')}</Text>
-                </View>
-                <ArrowRight color={theme.colors.textMuted} size={17} />
-              </PressScale>
-            ))
-          )}
-
+          {loading ? (
+            <ActivityIndicator color={theme.colors.text} style={{ marginTop: 40 }} />
+          ) : dashboard.priority.length === 0 ? (
+            <GlassCard style={styles.emptyPriority}>
+              <CheckCircle2 color={theme.colors.success} size={28} />
+              <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>{labels.nothingUrgent}</Text>
+              <Text style={[styles.emptySub, { color: theme.colors.textMuted }]}>{labels.nothingUrgentSub}</Text>
+            </GlassCard>
+          ) : (
+            dashboard.priority.slice(0, 4).map((card) => (
+              <GlassCard key={`priority-${card.card_id}`} style={styles.attentionCard}>
+                <View style={styles.attentionTopRow}>
+                  <View style={[styles.priorityIcon, { backgroundColor: card.type === 'TASK' ? theme.colors.bgSoft : theme.colors.accentSoft }]}>
+                    {card.type === 'TASK' ? <CheckCircle2 color={theme.colors.success} size={18} /> : <FileText color={theme.colors.accent} size={18} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.priorityTitle, { color: theme.colors.text }]} numberOfLines={2}>{card.title}</Text>
+                    <Text style={[styles.priorityMeta, { color: theme.colors.textMuted }]} numberOfLines={1}>{formatCardDate(card)} Â· {card.assignee || t('family')}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.attentionActions}>
+                  <PressScale testID={`attention-done-${card.card_id}`} onPress={() => toggle(card)} style={[styles.attentionDoneBtn, { backgroundColor: theme.colors.primary }]}>
+                    <CheckCircle2 color={theme.colors.primaryText} size={16} />
+                    <Text style={[styles.attentionDoneText, { color: theme.colors.primaryText }]}>Done</Text>
+                  </PressScale>
+                  <PressScale testID={`attention-delete-${card.card_id}`} onPress={() => remove(card)} style={[styles.attentionDeleteBtn, { backgroundColor: theme.colors.bgSoft, borderColor: theme.colors.cardBorder }]}>
+                    <Trash2 color={theme.colors.textMuted} size={16} />
+                  </PressScale>
+                </View>
+              </GlassCard>
+            ))
+          )}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>{labels.nextUp}</Text>
             <Text style={[styles.sectionSub, { color: theme.colors.textMuted }]}>{dashboard.nextUp.length}</Text>
@@ -586,15 +596,9 @@ export default function FeedScreen() {
             <Text style={[styles.footerSignalText, { color: theme.colors.textMuted }]}>Household COO · {childMembers.length} kids · {rewardCount} rewards</Text>
           </View>
 
-          <View style={{ height: 220 }} />
+          <View style={{ height: 120 }} />
         </ScrollView>
       </SafeAreaView>
-
-      <FloatingActionBar
-        onManual={openManual}
-        onCamera={() => setShowCamera(true)}
-        onVoice={() => setShowVoice(true)}
-      />
 
       <CameraCaptureModal
         visible={showCamera}
@@ -737,7 +741,12 @@ const styles = StyleSheet.create({
   empty: { paddingVertical: 36, alignItems: 'center' },
   emptyTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 21, textAlign: 'center' },
   emptySub: { fontFamily: 'Inter_500Medium', fontSize: 14, lineHeight: 20, textAlign: 'center', maxWidth: 270 },
-  priorityCard: { minHeight: 82, borderRadius: 26, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14, marginBottom: 10, shadowOpacity: 0.08, shadowRadius: 13, shadowOffset: { width: 0, height: 8 }, elevation: 2 },
+  attentionCard: { marginBottom: 12, borderRadius: 26, paddingVertical: 14 },
+  attentionTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  attentionActions: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
+  attentionDoneBtn: { flex: 1, minHeight: 44, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 14 },
+  attentionDoneText: { fontFamily: 'Inter_800ExtraBold', fontSize: 14 },
+  attentionDeleteBtn: { minWidth: 44, minHeight: 44, borderRadius: 9999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },  priorityCard: { minHeight: 82, borderRadius: 26, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 13, padding: 14, marginBottom: 10, shadowOpacity: 0.08, shadowRadius: 13, shadowOffset: { width: 0, height: 8 }, elevation: 2 },
   priorityIcon: { width: 44, height: 44, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   priorityTitle: { fontFamily: 'Inter_800ExtraBold', fontSize: 16, lineHeight: 21 },
   priorityMeta: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 2 },
