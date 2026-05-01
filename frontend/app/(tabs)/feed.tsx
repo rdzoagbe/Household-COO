@@ -725,9 +725,9 @@ export default function FeedScreen() {
 }
 
 const styles = StyleSheet.create({
-  heroQuickActions: { flexDirection: 'row', gap: 10, marginTop: 18, marginBottom: 14 },
-  heroQuickBtn: { flex: 1, minHeight: 54, borderRadius: 9999, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  heroQuickText: { color: '#202323', fontFamily: 'Inter_800ExtraBold', fontSize: 11 },
+  heroQuickActions: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginTop: 20, marginBottom: 18 },
+  heroQuickBtn: { flex: 1, minHeight: 58, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.94)', borderWidth: 1, borderColor: 'rgba(15,23,42,0.08)', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 12 },
+  heroQuickText: { color: '#202323', fontFamily: 'Inter_800ExtraBold', fontSize: 12, lineHeight: 14, textAlign: 'center' },
 
   plannerCard: { marginBottom: 18, paddingVertical: 18, gap: 14 },
   plannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
@@ -850,4 +850,5 @@ const styles = StyleSheet.create({
   footerSignal: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginTop: 22 },
   footerSignalText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, textAlign: 'center' },
 });
+
 
